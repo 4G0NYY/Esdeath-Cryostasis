@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -62,31 +63,52 @@ func modAsset(release *ghRelease) (*ghAsset, error) {
 
 var errNotFound = errors.New("not found")
 
-func getJSON(url string, target any) error {
+// fetch performs a GET and hands back the body, leaving status handling in one place for
+// every caller. The body must be closed by the caller.
+func fetch(url, accept string) (io.ReadCloser, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Accept", accept)
 	// GitHub rejects API requests without a User-Agent outright.
 	req.Header.Set("User-Agent", "esdeath-cryostasis-installer")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		switch {
+		case resp.StatusCode == http.StatusNotFound:
+			return nil, errNotFound
+		case resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") == "0":
+			return nil, errors.New("GitHub rate limit reached for this IP, try again in an hour")
+		default:
+			return nil, fmt.Errorf("GET %s returned %s", url, resp.Status)
+		}
+	}
+	return resp.Body, nil
+}
+
+func getJSON(url string, target any) error {
+	body, err := fetch(url, "application/vnd.github+json")
+	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer body.Close()
+	return json.NewDecoder(body).Decode(target)
+}
 
-	if resp.StatusCode == http.StatusNotFound {
-		return errNotFound
+func getXML(url string, target any) error {
+	body, err := fetch(url, "application/xml")
+	if err != nil {
+		return err
 	}
-	if resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") == "0" {
-		return errors.New("GitHub rate limit reached for this IP, try again in an hour")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("GET %s returned %s", url, resp.Status)
-	}
-	return json.NewDecoder(resp.Body).Decode(target)
+	defer body.Close()
+	return xml.NewDecoder(body).Decode(target)
 }
 
 // downloadFile writes a URL to disk through a temp file in the destination directory, so a

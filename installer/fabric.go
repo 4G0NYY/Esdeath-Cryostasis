@@ -53,7 +53,7 @@ func findFabricVersion(mcDir, mcVersion string) string {
 
 	// Several loader versions can coexist for one Minecraft version. Pick the newest.
 	sort.Slice(found, func(i, j int) bool {
-		return compareLoaderVersions(loaderOf(found[i], mcVersion), loaderOf(found[j], mcVersion)) < 0
+		return compareVersions(loaderOf(found[i], mcVersion), loaderOf(found[j], mcVersion)) < 0
 	})
 	return found[len(found)-1]
 }
@@ -62,9 +62,9 @@ func loaderOf(versionID, mcVersion string) string {
 	return strings.TrimSuffix(strings.TrimPrefix(versionID, "fabric-loader-"), "-"+mcVersion)
 }
 
-// compareLoaderVersions orders dotted numeric versions so that 0.17.2 sorts above 0.9.9,
+// compareVersions orders dotted numeric versions so that 0.17.2 sorts above 0.9.9,
 // which a plain string compare gets wrong.
-func compareLoaderVersions(a, b string) int {
+func compareVersions(a, b string) int {
 	aParts := strings.Split(a, ".")
 	bParts := strings.Split(b, ".")
 	for i := 0; i < len(aParts) || i < len(bParts); i++ {

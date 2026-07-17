@@ -19,9 +19,6 @@ const (
 	repoName  = "Esdeath-Cryostasis"
 	repoURL   = "https://github.com/4G0NYY/Esdeath-Cryostasis"
 
-	// Matches archives_base_name in gradle.properties, which names the released jar.
-	modArtifactPrefix = "esdeath-cryostasis-"
-
 	profileKey  = "esdeath-cryostasis"
 	profileName = "Esdeath Cryostasis"
 )
@@ -77,6 +74,16 @@ func run(mcDirFlag, mcVersion string, assumeYes bool) error {
 	} else {
 		ok("found %s", fabricVersion)
 	}
+
+	step("Installing Fabric API")
+	apiVersion, apiReplaced, err := installFabricApi(mcDir, mcVersion)
+	if err != nil {
+		return err
+	}
+	for _, old := range apiReplaced {
+		info("removed the previous jar %s", old)
+	}
+	ok("%s", apiVersion)
 
 	step("Fetching the latest release")
 	release, err := latestRelease()

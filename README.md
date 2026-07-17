@@ -42,12 +42,14 @@ Grab the installer for your platform from the
 | macOS (Intel) | `esdeath-installer-macos-intel` |
 
 It checks that Minecraft Java Edition is present, offers to install Fabric if it is
-missing, downloads the newest mod jar into your `mods` folder, and adds an "Esdeath
-Cryostasis" profile to the official launcher. Then pick that profile and hit Play.
+missing, installs Fabric API (the mod requires it), downloads the newest mod jar into your
+`mods` folder, and adds an "Esdeath Cryostasis" profile to the official launcher. Then pick
+that profile and hit Play.
 
-Re-run it any time to update: it pulls the newest jar and removes the old one, leaving
-everything else alone. It is a single static binary and needs no Java of its own, though
-installing Fabric does require a JVM somewhere (the launcher's bundled runtime counts).
+Re-run it any time to update: it pulls the newest mod jar and Fabric API, removes the
+versions they replace, and leaves every other mod alone. It is a single static binary and
+needs no Java of its own, though installing Fabric does require a JVM somewhere (the
+launcher's bundled runtime counts).
 
 Useful flags:
 

@@ -6,23 +6,47 @@ import (
 	"strings"
 )
 
-// installMod places the release jar in the mods folder and clears out any older Esdeath
-// jar. Sweeping first is what makes a re-run an update: Fabric loads every jar in the
-// folder, so leaving the previous version behind would crash the game on a duplicate mod
-// id rather than upgrade it.
+// Prefixes owned by this installer. A jar in the mods folder matching one of these is ours
+// to replace; anything else is another author's mod and is never touched.
+const (
+	modArtifactPrefix = "esdeath-cryostasis-"
+	fabricApiPrefix   = "fabric-api-"
+)
+
+// installMod places the release jar in the mods folder, replacing any older Esdeath jar.
 func installMod(mcDir string, asset *ghAsset) (dest string, replaced []string, err error) {
+	return installJar(mcDir, asset.Name, asset.URL, modArtifactPrefix)
+}
+
+// installFabricApi puts Fabric API in the mods folder. The mod declares a hard dependency
+// on it, so without this the game refuses to start with "incompatible mods found", which is
+// a confusing way to learn a dependency is missing.
+func installFabricApi(mcDir, mcVersion string) (version string, replaced []string, err error) {
+	version, url, filename, err := latestFabricApi(mcVersion)
+	if err != nil {
+		return "", nil, err
+	}
+	_, replaced, err = installJar(mcDir, filename, url, fabricApiPrefix)
+	return version, replaced, err
+}
+
+// installJar downloads one jar into the mods folder and clears out older jars sharing its
+// prefix. Sweeping is what makes a re-run an update: Fabric loads every jar in the folder,
+// so leaving the previous version behind would crash the game on a duplicate mod id rather
+// than upgrade it.
+func installJar(mcDir, name, url, sweepPrefix string) (dest string, replaced []string, err error) {
 	modsDir := filepath.Join(mcDir, "mods")
 	if err := os.MkdirAll(modsDir, 0o755); err != nil {
 		return "", nil, err
 	}
 
-	dest = filepath.Join(modsDir, asset.Name)
-	stale, err := staleModJars(modsDir, asset.Name)
+	dest = filepath.Join(modsDir, name)
+	stale, err := staleJars(modsDir, name, sweepPrefix)
 	if err != nil {
 		return "", nil, err
 	}
 
-	if err := downloadFile(asset.URL, dest); err != nil {
+	if err := downloadFile(url, dest); err != nil {
 		return "", nil, err
 	}
 
@@ -38,8 +62,9 @@ func installMod(mcDir string, asset *ghAsset) (dest string, replaced []string, e
 	return dest, replaced, nil
 }
 
-// staleModJars lists Esdeath jars in the mods folder other than the one being installed.
-func staleModJars(modsDir, keep string) ([]string, error) {
+// staleJars lists jars in the mods folder that share a prefix with the one being installed,
+// other than that jar itself.
+func staleJars(modsDir, keep, prefix string) ([]string, error) {
 	entries, err := os.ReadDir(modsDir)
 	if err != nil {
 		return nil, err
@@ -54,7 +79,7 @@ func staleModJars(modsDir, keep string) ([]string, error) {
 			continue
 		}
 		name := strings.ToLower(entry.Name())
-		if strings.HasPrefix(name, modArtifactPrefix) && strings.HasSuffix(name, ".jar") {
+		if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, ".jar") {
 			stale = append(stale, filepath.Join(modsDir, entry.Name()))
 		}
 	}

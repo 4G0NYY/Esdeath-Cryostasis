@@ -25,7 +25,7 @@ func TestStaleModJars(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stale, err := staleModJars(dir, "esdeath-cryostasis-0.2.0.jar")
+	stale, err := staleJars(dir, "esdeath-cryostasis-0.2.0.jar", modArtifactPrefix)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestStaleModJarsKeepsCaseVariant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stale, err := staleModJars(dir, "esdeath-cryostasis-0.2.0.jar")
+	stale, err := staleJars(dir, "esdeath-cryostasis-0.2.0.jar", modArtifactPrefix)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,69 @@ func TestStaleModJarsKeepsCaseVariant(t *testing.T) {
 	}
 }
 
-func TestCompareLoaderVersions(t *testing.T) {
+// The two prefixes share one mods folder, so each sweep must leave the other's jar alone.
+func TestStaleJarsPrefixesDoNotCollide(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{
+		"esdeath-cryostasis-0.2.0.jar",
+		"fabric-api-0.133.4+1.21.8.jar",
+		"fabric-api-0.136.1+1.21.8.jar",
+		"fabric-language-kotlin-1.13.0.jar",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stale, err := staleJars(dir, "fabric-api-0.136.1+1.21.8.jar", fabricApiPrefix)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]bool{}
+	for _, path := range stale {
+		got[filepath.Base(path)] = true
+	}
+	if !got["fabric-api-0.133.4+1.21.8.jar"] {
+		t.Error("the older Fabric API should be swept")
+	}
+	if got["fabric-api-0.136.1+1.21.8.jar"] {
+		t.Error("swept the Fabric API being installed")
+	}
+	if got["esdeath-cryostasis-0.2.0.jar"] {
+		t.Error("the Fabric API sweep took the mod jar with it")
+	}
+	// Shares the "fabric-" stem but is a different mod entirely.
+	if got["fabric-language-kotlin-1.13.0.jar"] {
+		t.Error("swept an unrelated fabric- mod")
+	}
+}
+
+func TestPickFabricApiVersion(t *testing.T) {
+	// Shaped like the real maven-metadata.xml: many game versions interleaved.
+	versions := []string{
+		"0.133.4+1.21.8",
+		"0.136.1+1.21.8",
+		"0.134.0+1.21.8",
+		"0.99.0+1.21.8",
+		"0.140.0+1.21.9",
+		"0.110.0+1.20.1",
+	}
+
+	// 0.136.1 over 0.99.0 is the case a string compare gets wrong.
+	if got := pickFabricApiVersion(versions, "1.21.8"); got != "0.136.1+1.21.8" {
+		t.Errorf("got %q, want the newest build for 1.21.8", got)
+	}
+	if got := pickFabricApiVersion(versions, "1.21.9"); got != "0.140.0+1.21.9" {
+		t.Errorf("got %q, want the only build for 1.21.9", got)
+	}
+	// Must not fall back to a build for a different game version.
+	if got := pickFabricApiVersion(versions, "1.21.4"); got != "" {
+		t.Errorf("got %q, want empty when no build matches", got)
+	}
+}
+
+func TestCompareVersions(t *testing.T) {
 	cases := []struct {
 		a, b string
 		want string // "<", ">", or "="
@@ -86,7 +148,7 @@ func TestCompareLoaderVersions(t *testing.T) {
 		{"0.17", "0.17.0", "="},
 	}
 	for _, c := range cases {
-		got := compareLoaderVersions(c.a, c.b)
+		got := compareVersions(c.a, c.b)
 		sign := "="
 		if got < 0 {
 			sign = "<"
@@ -94,7 +156,7 @@ func TestCompareLoaderVersions(t *testing.T) {
 			sign = ">"
 		}
 		if sign != c.want {
-			t.Errorf("compareLoaderVersions(%q, %q) = %s, want %s", c.a, c.b, sign, c.want)
+			t.Errorf("compareVersions(%q, %q) = %s, want %s", c.a, c.b, sign, c.want)
 		}
 	}
 }

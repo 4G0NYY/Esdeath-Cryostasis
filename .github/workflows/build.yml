@@ -5,12 +5,14 @@ name: build
 # code that ever ships is none: the mod jar carries no repackaged game, and the installer
 # downloads Fabric and the jar on the player's own machine, per the project ground rules.
 
+# Tags only. Ordinary commits to main do not build: this is a personal client with a
+# tag-driven release flow, so a run per commit is spend with nothing to publish at the end
+# of it. workflow_dispatch stays so the pipeline can still be exercised from the Actions tab
+# without inventing a throwaway tag.
 on:
   push:
-    branches: [ main ]
     tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: write
