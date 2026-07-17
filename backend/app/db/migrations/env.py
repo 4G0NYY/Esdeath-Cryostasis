@@ -10,8 +10,9 @@ from __future__ import annotations
 import os
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool, text
+from sqlalchemy import create_engine, engine_from_config, pool, text
 
+from app.db.dsn import parse_multihost, sync_engine_args
 from app.db.models import Base
 
 config = context.config
@@ -44,10 +45,23 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def run_migrations_online() -> None:
+def _make_connectable():
+    # Multi-host HA DSN: SQLAlchemy cannot parse the comma authority, so build the sync engine
+    # from a hostless URL plus psycopg2 connect_args carrying the comma-joined hosts and
+    # target_session_attrs (app/db/dsn.py). Migrations then fail over to the primary exactly like
+    # the async app does. A single-host URL takes the ordinary engine_from_config path.
+    multihost = parse_multihost(os.environ.get("CRYOSTASIS_DATABASE_URL", ""))
+    if multihost is not None:
+        url, connect_args = sync_engine_args(multihost)
+        return create_engine(url, poolclass=pool.NullPool, connect_args=connect_args)
+
     section = config.get_section(config.config_ini_section) or {}
     section["sqlalchemy.url"] = _database_url()
-    connectable = engine_from_config(section, prefix="sqlalchemy.", poolclass=pool.NullPool)
+    return engine_from_config(section, prefix="sqlalchemy.", poolclass=pool.NullPool)
+
+
+def run_migrations_online() -> None:
+    connectable = _make_connectable()
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
