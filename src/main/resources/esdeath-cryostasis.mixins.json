@@ -5,11 +5,13 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"client.AbstractContainerScreenMixin",
+		"client.AbstractSelectionListMixin",
 		"client.GameRendererMixin",
 		"client.GuiGraphicsMixin",
 		"client.KeyboardMixin",
 		"client.MouseMixin",
 		"client.MultiPlayerGameModeMixin",
+		"client.ScreenMixin",
 		"client.TitleScreenMixin"
 	],
 	"injectors": {

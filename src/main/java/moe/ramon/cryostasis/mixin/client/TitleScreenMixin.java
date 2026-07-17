@@ -156,15 +156,10 @@ public abstract class TitleScreenMixin extends Screen {
 	private void esdeath$render(GuiGraphics graphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		esdeath$background(graphics);
 		esdeath$brand(graphics);
+		// The widgets draw themselves: the client's global widget skin already paints vanilla
+		// buttons as the dark plates this screen wants, so there is nothing to restyle here.
 		for (GuiEventListener child : this.children()) {
-			if (child instanceof SpriteIconButton icon) {
-				// Language and accessibility icons keep their vanilla sprite look.
-				icon.render(graphics, mouseX, mouseY, delta);
-			} else if (child instanceof PlainTextButton text) {
-				text.render(graphics, mouseX, mouseY, delta);
-			} else if (child instanceof Button button) {
-				esdeath$drawButton(graphics, button, mouseX, mouseY);
-			} else if (child instanceof Renderable renderable) {
+			if (child instanceof Renderable renderable) {
 				renderable.render(graphics, mouseX, mouseY, delta);
 			}
 		}
@@ -187,31 +182,5 @@ public abstract class TitleScreenMixin extends Screen {
 		pose.scale(WORDMARK_SCALE, WORDMARK_SCALE);
 		graphics.drawCenteredString(this.font, WORDMARK, 0, 0, Theme.TEXT);
 		pose.popMatrix();
-	}
-
-	/**
-	 * Draws a menu button in the dark translucent style of the click GUI rows, larger to
-	 * suit the title screen. The vanilla Button widget still handles the click and hover
-	 * hit test; only its look is replaced here.
-	 */
-	private void esdeath$drawButton(GuiGraphics graphics, Button button, int mouseX, int mouseY) {
-		int bx = button.getX();
-		int by = button.getY();
-		int bw = button.getWidth();
-		int bh = button.getHeight();
-		boolean hovered = mouseX >= bx && mouseX < bx + bw && mouseY >= by && mouseY < by + bh;
-
-		graphics.fill(bx, by, bx + bw, by + bh, hovered ? Theme.ROW_HOVER : Theme.ROW);
-		if (hovered) {
-			graphics.fill(bx, by, bx + 2, by + bh, Theme.ACCENT);
-		}
-		// Thin steel border around the plate.
-		graphics.fill(bx, by, bx + bw, by + 1, Theme.ACCENT_DIM);
-		graphics.fill(bx, by + bh - 1, bx + bw, by + bh, Theme.ACCENT_DIM);
-		graphics.fill(bx, by, bx + 1, by + bh, Theme.ACCENT_DIM);
-		graphics.fill(bx + bw - 1, by, bx + bw, by + bh, Theme.ACCENT_DIM);
-
-		int textColor = button.active ? (hovered ? Theme.TEXT : Theme.SUBTEXT) : 0xFF707070;
-		graphics.drawCenteredString(this.font, button.getMessage(), bx + bw / 2, by + (bh - 8) / 2, textColor);
 	}
 }

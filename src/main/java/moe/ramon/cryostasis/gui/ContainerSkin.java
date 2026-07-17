@@ -27,11 +27,6 @@ public final class ContainerSkin {
 	private ContainerSkin() {
 	}
 
-	private static final int PANEL = 0xF01A2433;
-	private static final int FIELD = 0xFF10161F;
-	private static final int CELL = 0xFF0B0F16;
-	private static final int CELL_BORDER = 0xFF2A3648;
-
 	private static boolean active;
 	private static boolean painted;
 	private static int leftPos;
@@ -77,24 +72,17 @@ public final class ContainerSkin {
 		int x1 = leftPos + imageWidth;
 		int y1 = topPos + imageHeight;
 
-		graphics.fill(x0 - 3, y0 - 3, x1 + 3, y1 + 3, PANEL);
-		border(graphics, x0 - 3, y0 - 3, x1 + 3, y1 + 3, Theme.ACCENT);
-		graphics.fill(x0, y0, x1, y1, FIELD);
+		graphics.fill(x0 - 3, y0 - 3, x1 + 3, y1 + 3, Theme.PANEL_SOLID);
+		Skin.border(graphics, x0 - 3, y0 - 3, x1 + 3, y1 + 3, Theme.ACCENT);
+		graphics.fill(x0, y0, x1, y1, Theme.FIELD);
 
 		// Cells come from the menu's own slot list, so every container gets a grid that matches
 		// its real layout without a texture or a hand-placed rect per screen.
 		for (Slot slot : slots) {
 			int sx = leftPos + slot.x;
 			int sy = topPos + slot.y;
-			graphics.fill(sx - 1, sy - 1, sx + 17, sy + 17, CELL);
-			border(graphics, sx - 1, sy - 1, sx + 17, sy + 17, CELL_BORDER);
+			graphics.fill(sx - 1, sy - 1, sx + 17, sy + 17, Theme.CELL);
+			Skin.border(graphics, sx - 1, sy - 1, sx + 17, sy + 17, Theme.CELL_BORDER);
 		}
-	}
-
-	private static void border(GuiGraphics graphics, int x0, int y0, int x1, int y1, int color) {
-		graphics.fill(x0, y0, x1, y0 + 1, color);
-		graphics.fill(x0, y1 - 1, x1, y1, color);
-		graphics.fill(x0, y0, x0 + 1, y1, color);
-		graphics.fill(x1 - 1, y0, x1, y1, color);
 	}
 }
