@@ -122,9 +122,11 @@ public final class ConfigManager {
 					setting.read(settings.get(setting.getName()));
 				}
 			}
-			// Apply enabled last so onEnable runs after settings are restored.
-			if (obj.has("enabled") && obj.get("enabled").getAsBoolean()) {
-				module.setEnabled(true);
+			// Apply enabled last so onEnable runs after settings are restored. Apply the stored
+			// value both ways so a module that ships enabled by default can still be turned off
+			// persistently (setEnabled is a no-op when the state already matches).
+			if (obj.has("enabled")) {
+				module.setEnabled(obj.get("enabled").getAsBoolean());
 			}
 		}
 	}

@@ -3,6 +3,7 @@ package moe.ramon.cryostasis.input;
 import moe.ramon.cryostasis.gui.ClickGuiScreen;
 import moe.ramon.cryostasis.module.Module;
 import moe.ramon.cryostasis.module.ModuleManager;
+import moe.ramon.cryostasis.modules.misc.TabGuiModule;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
@@ -35,6 +36,12 @@ public final class InputHandler {
 		}
 		if (key == openGuiKey) {
 			mc.setScreen(new ClickGuiScreen());
+			return;
+		}
+		// The arrow-key menu, when enabled, consumes navigation keys before they can match a
+		// module hotkey. Any other key falls through so normal hotkeys still work.
+		TabGuiModule tabGui = modules.get(TabGuiModule.class);
+		if (tabGui != null && tabGui.isEnabled() && tabGui.handleKey(key)) {
 			return;
 		}
 		List<Module> all = modules.getModules();

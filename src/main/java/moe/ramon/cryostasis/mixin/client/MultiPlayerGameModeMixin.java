@@ -4,6 +4,9 @@ import moe.ramon.cryostasis.Cryostasis;
 import moe.ramon.cryostasis.module.ModuleManager;
 import moe.ramon.cryostasis.modules.combat.MoreParticlesModule;
 import moe.ramon.cryostasis.modules.combat.SharpnessModule;
+import moe.ramon.cryostasis.modules.player.AutoToolModule;
+import moe.ramon.cryostasis.util.InventoryUtil;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -28,6 +31,21 @@ public class MultiPlayerGameModeMixin {
 			return;
 		}
 		ModuleManager modules = cryostasis.getModuleManager();
+
+		// AutoTool: swap to the best weapon before the hit resolves. Injecting at HEAD means the
+		// attack reads the freshly selected slot, so this applies to manual clicks and Killaura
+		// alike (Killaura routes through this same attack call).
+		AutoToolModule autoTool = modules.get(AutoToolModule.class);
+		if (autoTool != null && autoTool.isEnabled() && autoTool.swapsWeaponOnAttack()) {
+			Minecraft mc = Minecraft.getInstance();
+			if (mc.player == player) {
+				int weaponSlot = InventoryUtil.bestWeaponSlot(mc);
+				if (weaponSlot >= 0) {
+					InventoryUtil.selectHotbarSlot(mc, weaponSlot);
+				}
+			}
+		}
+
 		MoreParticlesModule more = modules.get(MoreParticlesModule.class);
 		SharpnessModule sharp = modules.get(SharpnessModule.class);
 		boolean moreOn = more != null && more.isEnabled();

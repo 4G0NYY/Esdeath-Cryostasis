@@ -11,7 +11,9 @@
 		"client.KeyboardMixin",
 		"client.MouseMixin",
 		"client.MultiPlayerGameModeMixin",
+		"client.PlayerMixin",
 		"client.ScreenMixin",
+		"client.TakeAllMixin",
 		"client.TitleScreenMixin"
 	],
 	"injectors": {

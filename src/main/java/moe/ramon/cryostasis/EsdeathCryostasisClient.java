@@ -10,9 +10,17 @@ import moe.ramon.cryostasis.modules.hud.PlainsModule;
 import moe.ramon.cryostasis.modules.hud.RainbowModule;
 import moe.ramon.cryostasis.modules.hud.ReachDisplayModule;
 import moe.ramon.cryostasis.modules.hud.XyzModule;
+import moe.ramon.cryostasis.modules.combat.KillauraModule;
 import moe.ramon.cryostasis.modules.combat.MoreParticlesModule;
 import moe.ramon.cryostasis.modules.combat.SharpnessModule;
 import moe.ramon.cryostasis.modules.misc.AutoTextModule;
+import moe.ramon.cryostasis.modules.misc.DiscordPresenceModule;
+import moe.ramon.cryostasis.modules.misc.TabGuiModule;
+import moe.ramon.cryostasis.modules.misc.TakeAllModule;
+import moe.ramon.cryostasis.modules.movement.AutoPathModule;
+import moe.ramon.cryostasis.modules.movement.SafeWalkModule;
+import moe.ramon.cryostasis.modules.player.AutoEquipModule;
+import moe.ramon.cryostasis.modules.player.AutoToolModule;
 import moe.ramon.cryostasis.modules.player.ToggleSprintModule;
 import moe.ramon.cryostasis.modules.render.BlockOutlineModule;
 import moe.ramon.cryostasis.modules.render.HitboxModule;
@@ -25,6 +33,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.PlayerRenderState;
@@ -58,6 +67,16 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		HudRenderCallback.EVENT.register((drawContext, tickCounter) ->
 				cryostasis.getHudManager().render(drawContext, tickCounter.getGameTimeDeltaPartialTick(false)));
 
+		// The arrow-key TabGui draws its own overlay (it is not a stacked HUD element) and only
+		// while no screen is open and the HUD is visible, matching the rest of the overlay.
+		TabGuiModule tabGui = cryostasis.getModuleManager().get(TabGuiModule.class);
+		Minecraft minecraft = Minecraft.getInstance();
+		HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
+			if (tabGui.isEnabled() && minecraft.screen == null && !minecraft.options.hideGui) {
+				tabGui.render(drawContext);
+			}
+		});
+
 		// Persist on shutdown as a backstop; the GUI also saves when it closes.
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> cryostasis.getConfigManager().save());
 
@@ -89,14 +108,23 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new RainbowModule());
 		// Movement
 		modules.register(new ToggleSprintModule());
+		modules.register(new SafeWalkModule());
+		modules.register(new AutoPathModule());
 		// Render
 		modules.register(new HitboxModule());
 		modules.register(new BlockOutlineModule());
 		modules.register(new ZoomModule());
-		// Combat (particle-only feedback)
+		// Combat
 		modules.register(new MoreParticlesModule());
 		modules.register(new SharpnessModule());
+		modules.register(new KillauraModule());
+		// Player
+		modules.register(new AutoToolModule());
+		modules.register(new AutoEquipModule());
 		// Misc
 		modules.register(new AutoTextModule());
+		modules.register(new TakeAllModule());
+		modules.register(new TabGuiModule());
+		modules.register(new DiscordPresenceModule());
 	}
 }
