@@ -10,10 +10,15 @@ WORKDIR /app
 
 # Install dependencies first so the layer caches across code changes. asyncpg is included
 # here (unlike the dev extras) because the container always talks to a real Postgres.
+# psycopg2-binary is here too and only here: the app runs async on asyncpg, but the boot-time
+# `alembic upgrade head` runs on a SYNC driver (migrations/env.py strips +asyncpg), and the
+# default postgresql:// dialect resolves to psycopg2. Without it the container boots, then dies
+# on the first migration against a real database - which the aiosqlite test suite never hits.
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir \
     "fastapi>=0.115" "uvicorn[standard]>=0.32" "pydantic>=2.9" "pydantic-settings>=2.6" \
-    "sqlalchemy[asyncio]>=2.0.36" "asyncpg>=0.30" "alembic>=1.14" "httpx>=0.27" "pyjwt>=2.9"
+    "sqlalchemy[asyncio]>=2.0.36" "asyncpg>=0.30" "psycopg2-binary>=2.9" "alembic>=1.14" \
+    "httpx>=0.27" "pyjwt>=2.9"
 
 COPY app ./app
 COPY alembic.ini ./

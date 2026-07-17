@@ -119,3 +119,75 @@ jobs:
         with:
           files: installer/dist/*
           fail_on_unmatched_files: true
+
+  # The backend container is the third shippable, and the odd one out: it does not attach to
+  # the GitHub Release, it publishes to GHCR so a `docker compose pull` can redeploy it. It is
+  # independent of the mod jar, so no `needs` - it runs alongside build/installer. Nothing here
+  # races on the release, so there is no serialization to worry about.
+  backend-image:
+    name: Backend image
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    # Least privilege: this job writes to the package registry, not the release. It overrides
+    # the workflow-level `contents: write`, so it must re-grant `contents: read` to check out.
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Gate the image on the suite the same way the mod ships behind `gradle build`: a broken
+      # backend must never reach `:latest`, because a redeploy pulls that tag blind. The suite
+      # needs no database - it runs against repo/memory.py.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install and test
+        run: |
+          set -eu
+          pip install -e ".[dev]"
+          pytest
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # GITHUB_TOKEN is scoped to this repo's packages by the `packages: write` grant above; no
+      # PAT needed as long as the image lives under the same owner.
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Hardcoded lowercase owner: GHCR rejects uppercase, and github.repository_owner is the
+      # login verbatim (4G0NYY), which would need lowercasing anyway. The compose file pins
+      # this exact path, so pinning it here keeps the two in lockstep.
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/4g0nyy/cryostasis-backend
+          # On a v* tag: 1.2.3, 1.2, and latest. workflow_dispatch produces no tags and does
+          # not push (see `push:` below), so it only validates that the image still builds.
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          # Only tag builds publish. A dispatch run builds to catch breakage but pushes nothing,
+          # mirroring how the mod and installer only attach to a release on a tag.
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

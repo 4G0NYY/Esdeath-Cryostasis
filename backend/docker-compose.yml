@@ -1,0 +1,65 @@
+# Deploy-side compose for the Cryostasis backend. This pulls the image the CI pipeline
+# publishes to GHCR on every v* tag, so a redeploy is:
+#
+#     docker compose pull && docker compose up -d
+#
+# It is the counterpart to the `backend-image` job in .github/workflows/build.yml. For local
+# development against your working tree instead of the published image, comment out `image:`
+# and uncomment `build: .` on the backend service.
+#
+# Secrets are required, not defaulted: POSTGRES_PASSWORD (and JWT_SECRET when auth is on) use
+# the ${VAR:?message} form, so `up` fails loudly with a message rather than silently shipping
+# a well-known password. Put real values in a .env file beside this one (see the block at the
+# bottom) - Compose loads it automatically.
+
+services:
+  backend:
+    image: ghcr.io/4g0nyy/cryostasis-backend:latest
+    # build: .            # local dev: build from ./ instead of pulling GHCR
+    restart: unless-stopped
+    depends_on:
+      db:
+        # Wait for Postgres to accept connections, not just to have a container. The entrypoint
+        # runs `alembic upgrade head` immediately, which needs a live database or it aborts.
+        condition: service_healthy
+    environment:
+      # Normalized to postgresql+asyncpg:// by the app and stripped back to a sync driver by
+      # Alembic; a plain postgresql:// URL is correct for both (see db/session.py and env.py).
+      CRYOSTASIS_DATABASE_URL: postgresql://${POSTGRES_USER:-cryostasis}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-cryostasis}
+      # Auth is off by default so the client works before its handshake ships. Flip this to
+      # true only once JWT_SECRET below is a real secret, or the app refuses to boot.
+      CRYOSTASIS_REQUIRE_AUTH: ${CRYOSTASIS_REQUIRE_AUTH:-false}
+      CRYOSTASIS_JWT_SECRET: ${CRYOSTASIS_JWT_SECRET:-dev-insecure-secret}
+      CRYOSTASIS_CDN_BASE_URL: ${CRYOSTASIS_CDN_BASE_URL:-https://cdn.cryostasis.ramon.moe}
+    # uvicorn listens on 8080. The Dockerfile notes this sits behind the host's TLS terminator,
+    # so bind to loopback and let your reverse proxy (Caddy/nginx/Traefik) terminate HTTPS and
+    # forward to it. Drop the 127.0.0.1 prefix only if you are exposing it directly.
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cryostasis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-cryostasis}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cryostasis} -d ${POSTGRES_DB:-cryostasis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  pgdata:
+
+# --- .env beside this file (do not commit it) --------------------------------
+# POSTGRES_USER=cryostasis
+# POSTGRES_PASSWORD=<a-long-random-string>
+# POSTGRES_DB=cryostasis
+# # Only when enforcing the session handshake:
+# CRYOSTASIS_REQUIRE_AUTH=true
+# CRYOSTASIS_JWT_SECRET=<another-long-random-string>
