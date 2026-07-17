@@ -6,6 +6,7 @@
 	"client": [
 		"client.AbstractContainerScreenMixin",
 		"client.GameRendererMixin",
+		"client.GuiGraphicsMixin",
 		"client.KeyboardMixin",
 		"client.MouseMixin",
 		"client.MultiPlayerGameModeMixin",

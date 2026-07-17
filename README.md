@@ -29,6 +29,34 @@ marked as such in `Todo.md`. See it for the full roadmap and per-item progress.
 
 ## Installing
 
+### With the installer (recommended)
+
+Grab the installer for your platform from the
+[latest release](https://github.com/4G0NYY/Esdeath-Cryostasis/releases/latest) and run it:
+
+| Platform | File |
+| --- | --- |
+| Windows | `esdeath-installer-windows-amd64.exe` |
+| Linux | `esdeath-installer-linux-amd64` |
+| macOS (Apple silicon) | `esdeath-installer-macos-apple-silicon` |
+| macOS (Intel) | `esdeath-installer-macos-intel` |
+
+It checks that Minecraft Java Edition is present, offers to install Fabric if it is
+missing, downloads the newest mod jar into your `mods` folder, and adds an "Esdeath
+Cryostasis" profile to the official launcher. Then pick that profile and hit Play.
+
+Re-run it any time to update: it pulls the newest jar and removes the old one, leaving
+everything else alone. It is a single static binary and needs no Java of its own, though
+installing Fabric does require a JVM somewhere (the launcher's bundled runtime counts).
+
+Useful flags:
+
+- `-y` answer yes to every prompt, for unattended runs.
+- `-dir <path>` point at `.minecraft` if it is not in the default location.
+- `-mc <version>` target a Minecraft version other than 1.21.8.
+
+### By hand
+
 Distribution is a plain Fabric mod, so it works with any existing Fabric launcher (the
 official launcher with a Fabric profile, Prism, MultiMC, and so on). A custom launcher is
 not required.
@@ -37,7 +65,8 @@ not required.
 2. Drop the `esdeath-cryostasis-<version>.jar` into your `mods` folder.
 3. Launch the game and press Right Shift to open the click GUI.
 
-Prebuilt jars are attached to tagged GitHub Releases; see the `build` workflow.
+Prebuilt jars and installers are attached to tagged GitHub Releases; see the `build`
+workflow.
 
 ## Target stack
 
@@ -79,6 +108,7 @@ settings, and drag panel headers to rearrange.
   - `service/` shared services such as the click tracker.
   - `mixin/client/` game hooks (mouse and keyboard).
   - `modules/` concrete modules.
+- `installer/` the standalone Go CLI installer (no dependencies, one binary per platform).
 - `docs/` recovered specification and backend API design.
 
 ## Credits

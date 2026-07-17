@@ -1,13 +1,13 @@
 package moe.ramon.cryostasis.mixin.client;
 
-import moe.ramon.cryostasis.gui.Theme;
+import moe.ramon.cryostasis.gui.ContainerSkin;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.Slot;
 import org.joml.Matrix3x2fStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -22,6 +22,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * grid derived from the menu's own slot positions, so it works for any container without a
  * texture per screen. The title and inventory labels are redrawn in light text so they
  * stay readable on the dark panel.
+ *
+ * The swap itself happens in ContainerSkin, driven from GuiGraphicsMixin. This class only
+ * arms it around renderBg, because renderBg has to run: screens draw their live contents
+ * there, not just their background.
  */
 @Mixin(AbstractContainerScreen.class)
 public abstract class AbstractContainerScreenMixin {
@@ -47,17 +51,16 @@ public abstract class AbstractContainerScreenMixin {
 	@SuppressWarnings("rawtypes")
 	protected AbstractContainerMenu menu;
 
-	private static final int PANEL = 0xF01A2433;
-	private static final int FIELD = 0xFF10161F;
-	private static final int CELL = 0xFF0B0F16;
-	private static final int CELL_BORDER = 0xFF2A3648;
+	@Shadow
+	protected abstract void renderBg(GuiGraphics graphics, float delta, int mouseX, int mouseY);
+
 	private static final int TITLE_TEXT = 0xFFE6ECF5;
 	private static final int LABEL_TEXT = 0xFF9AA7B8;
 
 	/**
-	 * Replaces the vanilla container background texture with the themed dark panel. Called
-	 * in place of renderBg, so the world dim before it is kept and the slots and items that
-	 * render afterward land on top of the dark cells.
+	 * Arms the themed panel for this screen's renderBg. renderBg is still called: replacing it
+	 * would drop everything else screens draw inside it, from the survival inventory's player
+	 * model to the creative tab strip.
 	 */
 	@Redirect(
 			method = "renderBackground(Lnet/minecraft/client/gui/GuiGraphics;IIF)V",
@@ -67,25 +70,24 @@ public abstract class AbstractContainerScreenMixin {
 							+ "renderBg(Lnet/minecraft/client/gui/GuiGraphics;FII)V"))
 	private void esdeath$darkBackground(AbstractContainerScreen<?> instance, GuiGraphics graphics,
 			float delta, int mouseX, int mouseY) {
-		int x0 = leftPos;
-		int y0 = topPos;
-		int x1 = leftPos + imageWidth;
-		int y1 = topPos + imageHeight;
-
-		graphics.fill(x0 - 3, y0 - 3, x1 + 3, y1 + 3, PANEL);
-		esdeath$border(graphics, x0 - 3, y0 - 3, x1 + 3, y1 + 3, Theme.ACCENT);
-		graphics.fill(x0, y0, x1, y1, FIELD);
-
-		for (Slot slot : menu.slots) {
-			int sx = leftPos + slot.x;
-			int sy = topPos + slot.y;
-			graphics.fill(sx - 1, sy - 1, sx + 17, sy + 17, CELL);
-			esdeath$border(graphics, sx - 1, sy - 1, sx + 17, sy + 17, CELL_BORDER);
+		ContainerSkin.begin(leftPos, topPos, imageWidth, imageHeight, menu.slots);
+		try {
+			renderBg(graphics, delta, mouseX, mouseY);
+		} finally {
+			// A screen that throws mid-render must not leave the guard armed, or the next raw
+			// texture blit anywhere in the game would be swallowed.
+			ContainerSkin.end();
 		}
 	}
 
 	@Inject(method = "renderContents(Lnet/minecraft/client/gui/GuiGraphics;IIF)V", at = @At("TAIL"))
 	private void esdeath$lightLabels(GuiGraphics graphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		// The creative screen titles its own tabs and has no player-inventory label, so the
+		// generic label pass would stamp a stray "Inventory" over the item grid.
+		if ((Object) this instanceof CreativeModeInventoryScreen) {
+			return;
+		}
+
 		// Redraw the labels light, over the vanilla dark ones, in the container's local space.
 		Matrix3x2fStack pose = graphics.pose();
 		pose.pushMatrix();
@@ -97,12 +99,5 @@ public abstract class AbstractContainerScreenMixin {
 		graphics.drawString(Minecraft.getInstance().font, playerInventoryTitle,
 				inventoryLabelX, inventoryLabelY, LABEL_TEXT, false);
 		pose.popMatrix();
-	}
-
-	private void esdeath$border(GuiGraphics graphics, int x0, int y0, int x1, int y1, int color) {
-		graphics.fill(x0, y0, x1, y0 + 1, color);
-		graphics.fill(x0, y1 - 1, x1, y1, color);
-		graphics.fill(x0, y0, x0 + 1, y1, color);
-		graphics.fill(x1 - 1, y0, x1, y1, color);
 	}
 }

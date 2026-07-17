@@ -11,6 +11,11 @@ build/
 out/
 classes/
 
+# Release staging. The build workflow stages the mod jar here, and the installer job
+# cross-compiles into installer/dist, so both appear after a local run of those steps.
+dist/
+installer/dist/
+
 # Loom / Fabric
 run/
 *.log
