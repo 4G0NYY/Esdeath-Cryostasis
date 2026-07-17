@@ -253,8 +253,13 @@ jobs:
 
       # wails build runs the frontend install and build first (per wails.json), then the Go
       # build with the embedded dist, then packages the native binary into build/bin.
+      #
+      # -tags webkit2_41 is required on Linux: ubuntu-latest (24.04) ships only the WebKitGTK
+      # 4.1 dev package, but Wails links against 4.0 by default, so pkg-config would fail
+      # looking for the absent webkit2gtk-4.0.pc. The tag switches it to the 4.1 bindings we
+      # install above. It is inert on Windows and macOS, whose webviews are part of the OS.
       - name: Build
-        run: wails build -platform ${{ matrix.platform }} -clean -o esdeath-cryostasis-launcher
+        run: wails build -platform ${{ matrix.platform }} -tags webkit2_41 -clean -o esdeath-cryostasis-launcher
 
       # Normalise the platform-specific output into one asset name. macOS produces a .app
       # bundle (a directory), so it is zipped; the others are single binaries renamed in place.
@@ -265,7 +270,10 @@ jobs:
           if [ "${{ runner.os }}" = "macOS" ]; then
             zip -r "${{ matrix.asset }}" ./*.app
           elif [ "${{ runner.os }}" = "Windows" ]; then
-            mv esdeath-cryostasis-launcher.exe "${{ matrix.asset }}"
+            # -o sets the output name verbatim, so Wails does not append .exe on Windows the
+            # way it would by default; the binary lands as esdeath-cryostasis-launcher, no
+            # extension. Rename that (not a phantom .exe) to the .exe asset name.
+            mv esdeath-cryostasis-launcher "${{ matrix.asset }}"
           else
             mv esdeath-cryostasis-launcher "${{ matrix.asset }}"
           fi
