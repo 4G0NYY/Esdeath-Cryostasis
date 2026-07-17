@@ -1,0 +1,17 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "esdeath-cryostasis-launcher",
+  "outputfilename": "esdeath-cryostasis-launcher",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "4G0NYY"
+  },
+  "info": {
+    "companyName": "Esdeath: Cryostasis",
+    "productName": "Esdeath: Cryostasis Launcher",
+    "comments": "Installer and backend selector for the Esdeath: Cryostasis Minecraft client"
+  }
+}

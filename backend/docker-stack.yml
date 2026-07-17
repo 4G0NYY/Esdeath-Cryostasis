@@ -1,0 +1,83 @@
+# Docker Swarm stack for the Cryostasis backend, for an existing HA Postgres (Patroni + etcd +
+# pgbouncer). Unlike docker-compose.yml, this brings no database of its own: it points at your
+# pgbouncer and runs several stateless replicas behind the routing mesh.
+#
+#   docker stack deploy -c docker-stack.yml cryostasis
+#
+# The service is stateless, so replicas scale freely. Each replica runs `alembic upgrade head`
+# on start; a transaction-level advisory lock serializes that, so a rolling update or a fresh
+# deploy does not race (see app/db/migrations/env.py). The async engine is configured for
+# pgbouncer transaction pooling (app/db/session.py), so any pool_mode is safe.
+
+version: "3.9"
+
+services:
+  backend:
+    image: ghcr.io/4g0nyy/cryostasis-backend:latest
+    environment:
+      # Non-secret config. The database URL and JWT secret are Docker secrets (below), read from
+      # /run/secrets by pydantic-settings, so no password sits in this file or in `docker inspect`.
+      CRYOSTASIS_REQUIRE_AUTH: "true"
+      CRYOSTASIS_CDN_BASE_URL: "https://cdn.cryostasis.ramon.moe"
+      CRYOSTASIS_PRESENCE_WINDOW_SECONDS: "120"
+    secrets:
+      # CRYOSTASIS_DATABASE_URL must point at pgbouncer, e.g.
+      #   postgresql://cryostasis:<pw>@pgbouncer:6432/cryostasis
+      # The +asyncpg driver is added by the app; a plain postgresql:// URL is correct.
+      - CRYOSTASIS_DATABASE_URL
+      - CRYOSTASIS_JWT_SECRET
+    networks:
+      # The overlay your pgbouncer is reachable on. Fronting this with your own reverse proxy on
+      # the same network is preferred over publishing a port, since the app expects TLS to be
+      # terminated ahead of it.
+      - database
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      replicas: 3
+      update_config:
+        # Zero-downtime rolling updates: bring a new task up and healthy before retiring an old
+        # one. Keep schema changes backward compatible (expand then contract) so old and new
+        # replicas can run against the same database during the roll.
+        order: start-first
+        parallelism: 1
+        delay: 10s
+      rollback_config:
+        order: start-first
+        parallelism: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 96M
+    # Uncomment to publish through the routing mesh instead of an internal reverse proxy. The app
+    # serves plain HTTP and expects TLS to be terminated in front of it, so only expose it behind
+    # your ingress.
+    # ports:
+    #   - target: 8080
+    #     published: 8080
+    #     protocol: tcp
+    #     mode: ingress
+
+networks:
+  database:
+    # The overlay network your Patroni/pgbouncer stack already runs on. Create it once with
+    # `docker network create --driver overlay --attachable database`, or mark it external if it
+    # is managed by another stack.
+    external: true
+
+secrets:
+  # Create these before deploying, for example:
+  #   printf 'postgresql://cryostasis:<pw>@pgbouncer:6432/cryostasis' | docker secret create CRYOSTASIS_DATABASE_URL -
+  #   openssl rand -hex 32 | docker secret create CRYOSTASIS_JWT_SECRET -
+  CRYOSTASIS_DATABASE_URL:
+    external: true
+  CRYOSTASIS_JWT_SECRET:
+    external: true

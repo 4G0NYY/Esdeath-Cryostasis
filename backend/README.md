@@ -119,4 +119,45 @@ docker run -p 8080:8080 -e CRYOSTASIS_DATABASE_URL=postgresql://... cryostasis-b
 ```
 
 The entrypoint runs `alembic upgrade head` and then uvicorn. `/health` is the platform
-probe.
+probe. For a single host with its own Postgres, `docker-compose.yml` wires the two together.
+
+## Scaling: stateless and Swarm-ready
+
+The service is stateless and safe to run as several replicas behind a load balancer. Every
+request-scoped piece of state lives in shared storage, not in a replica:
+
+- Player data (cosmetics, status, rank, server, cape) is read and written per request through
+  the Postgres repo, with no in-process cache.
+- Presence is derived from the `last_seen` column against a window, so any replica computes the
+  same online list, and a crashed client falls offline on its own.
+- ETags on the hot cosmetics path are a hash of the payload, so conditional requests work no
+  matter which replica answers.
+- Auth tokens are stateless JWTs; every replica validates them as long as they share
+  `CRYOSTASIS_JWT_SECRET` (they do, from one secret).
+- Login nonces are in the `auth_nonces` table, not in process, so `/auth/nonce` and
+  `/auth/session` can land on different replicas.
+
+Two deployment details make this hold on a real cluster:
+
+- **Migrations are concurrency-safe.** Each replica runs `alembic upgrade head` on start; a
+  transaction-level Postgres advisory lock (`app/db/migrations/env.py`) serializes them, so a
+  fresh deploy or a rolling update does not race. Keep schema changes backward compatible
+  (expand then contract) so old and new replicas can run together during a roll.
+- **pgbouncer is handled.** The async engine disables asyncpg prepared-statement caching and
+  uses unique statement names (`app/db/session.py`), so it is correct under any pgbouncer
+  `pool_mode`, not only session pooling. Point `CRYOSTASIS_DATABASE_URL` at pgbouncer.
+
+The one intentional per-replica component is the rate limiter (`app/api/deps.py`): it is
+in-process, so the effective cap is `RATE_LIMIT_PER_MINUTE` times the replica count. That is an
+accepted trade for abuse protection on a cosmetics backend; a strict cluster-wide cap would need
+a shared store and a round-trip per mutating request.
+
+`docker-stack.yml` is a ready Swarm stack: replicas, rolling updates, a healthcheck, and Docker
+secrets for the database URL and JWT secret (read from `/run/secrets` via `secrets_dir`, so no
+password sits in the stack file). It brings no database of its own; it points at your pgbouncer.
+
+```
+printf 'postgresql://cryostasis:<pw>@pgbouncer:6432/cryostasis' | docker secret create CRYOSTASIS_DATABASE_URL -
+openssl rand -hex 32 | docker secret create CRYOSTASIS_JWT_SECRET -
+docker stack deploy -c docker-stack.yml cryostasis
+```

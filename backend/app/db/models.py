@@ -66,3 +66,19 @@ class CapeRow(Base):
     __tablename__ = "capes"
 
     name: Mapped[str] = mapped_column(String(128), primary_key=True)
+
+
+class NonceRow(Base):
+    """Single-use, short-lived auth nonces (architecture 4).
+
+    In the database rather than in process so the login handshake survives horizontal scaling:
+    a nonce issued by one replica must be consumable by another, since the /auth/nonce and
+    /auth/session calls can land on different replicas behind a load balancer. Rows are swept on
+    issue and validated against expiry on consume, so a restart or a lost sweep just means the
+    client asks for a fresh nonce.
+    """
+
+    __tablename__ = "auth_nonces"
+
+    server_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

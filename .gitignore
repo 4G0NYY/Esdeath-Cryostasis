@@ -16,6 +16,13 @@ classes/
 dist/
 installer/dist/
 
+# Launcher (Wails). node_modules and the built frontend are generated. The frontend must be
+# built before the Go //go:embed can compile, which `wails build` and the launcher CI job do
+# for you; a bare `go build` needs `npm run build` in frontend/ first.
+launcher/frontend/node_modules/
+launcher/frontend/dist/
+launcher/build/bin/
+
 # Loom / Fabric
 run/
 *.log

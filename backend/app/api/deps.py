@@ -34,9 +34,16 @@ def settings_dep(request: Request) -> Settings:
 
 
 class RateLimiter:
-    """Sliding-window limiter keyed by authenticated UUID, not IP, so players behind one
-    NAT do not share a bucket (architecture 8). Fixed at one minute; the cap is the config
-    value. In-process, which matches the single-replica deployment presence also assumes."""
+    """Sliding-window limiter keyed by authenticated UUID, not IP, so players behind one NAT do
+    not share a bucket (architecture 8). Fixed at one minute; the cap is the config value.
+
+    Deliberately in-process, and the one component that is not shared across replicas: the
+    effective cap becomes per_minute times the replica count, since each replica keeps its own
+    buckets. That is an accepted trade for a cosmetics backend, where the limiter is abuse
+    protection rather than a metered quota, and it keeps this hot check off the database. A
+    strict cluster-wide cap would need a shared store (Postgres or Redis) and a round-trip per
+    mutating request. Everything else in the service is stateless: player data and presence
+    live in Postgres, tokens are stateless JWTs, and nonces moved to a shared store."""
 
     def __init__(self, per_minute: int) -> None:
         self._per_minute = per_minute

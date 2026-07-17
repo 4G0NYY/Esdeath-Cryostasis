@@ -29,7 +29,20 @@ marked as such in `Todo.md`. See it for the full roadmap and per-item progress.
 
 ## Installing
 
-### With the installer (recommended)
+### With the launcher (recommended)
+
+The desktop launcher (`launcher/`, attached to each
+[release](https://github.com/4G0NYY/Esdeath-Cryostasis/releases/latest)) installs and updates
+the mod for you, and adds one thing the CLI installer cannot: a Settings field to point the
+client at any backend, defaulting to the hosted `cryostasis.ramon.moe/api`. Self-hosting the
+open-source backend? Enter your instance there and the launcher pins it into the launch
+profile. It then hands off to the official Minecraft launcher to play. See
+[`launcher/README.md`](launcher/README.md).
+
+### With the installer
+
+For a scripted or headless setup, the command-line installer does the install and update side
+without the GUI or the backend picker.
 
 Grab the installer for your platform from the
 [latest release](https://github.com/4G0NYY/Esdeath-Cryostasis/releases/latest) and run it:

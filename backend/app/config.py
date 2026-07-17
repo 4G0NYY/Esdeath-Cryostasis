@@ -6,13 +6,24 @@ for a local run, so `uvicorn app.main:app` works with no environment at all.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Docker secrets land here as files named for the env var, e.g. /run/secrets/CRYOSTASIS_JWT_SECRET.
+# Pointed at only when it exists so a Swarm deploy reads secrets from files while a plain dev run
+# (where the directory is absent) stays silent instead of warning on every Settings build.
+_SECRETS_DIR = "/run/secrets"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="CRYOSTASIS_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="CRYOSTASIS_",
+        env_file=".env",
+        extra="ignore",
+        secrets_dir=_SECRETS_DIR if os.path.isdir(_SECRETS_DIR) else None,
+    )
 
     version: str = "cryostasis-1"
 

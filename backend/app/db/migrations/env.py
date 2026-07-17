@@ -10,12 +10,16 @@ from __future__ import annotations
 import os
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 from app.db.models import Base
 
 config = context.config
 target_metadata = Base.metadata
+
+# Arbitrary but fixed key for the migration advisory lock. Every replica must use the same
+# value for the lock to actually serialize them; the number itself is meaningless.
+_MIGRATION_LOCK_KEY = 5_141_982
 
 
 def _database_url() -> str:
@@ -47,6 +51,16 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
+            # Every Swarm replica runs `alembic upgrade head` on start, so on a fresh database
+            # they would all try to create the schema at once and all but one would crash. A
+            # transaction-level advisory lock makes the others wait, then find the schema already
+            # at head and no-op. It is transaction-scoped (released on commit, not held for the
+            # session), so it stays correct through a transaction-pooling pgbouncer, which a
+            # session-level lock would not. Postgres only; other dialects have no such function.
+            if connection.dialect.name == "postgresql":
+                connection.execute(
+                    text("SELECT pg_advisory_xact_lock(:key)"), {"key": _MIGRATION_LOCK_KEY}
+                )
             context.run_migrations()
 
 

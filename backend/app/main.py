@@ -16,35 +16,46 @@ from fastapi import FastAPI
 
 from app.api.deps import RateLimiter
 from app.api.v1 import auth, cosmetics, meta, players
-from app.auth.session import NonceStore
 from app.config import Settings, get_settings
 
 
-def _build_repo(settings: Settings):
-    """Select the storage backend. Empty DATABASE_URL selects the in-memory repo, which is
-    both the zero-config dev default and what the test suite runs against."""
+def _build_backends(settings: Settings):
+    """Select the repo and the nonce store together. Empty DATABASE_URL selects the in-memory
+    pair (the zero-config dev default and what the test suite runs against); a URL selects the
+    Postgres pair, which share one engine so the process holds a single connection pool.
+
+    Both live behind the same seam for the same reason: the service runs as several replicas, so
+    neither the player data nor the auth nonces can live in process."""
     if not settings.database_url:
+        from app.auth.session import MemoryNonceStore
         from app.repo.memory import MemoryRepo
 
-        return MemoryRepo()
+        return MemoryRepo(), MemoryNonceStore(ttl_seconds=settings.presence_window_seconds), None
 
+    from app.auth.session import PostgresNonceStore
     from app.db.session import make_engine, make_sessionmaker
     from app.repo.postgres import PostgresRepo
 
     engine = make_engine(settings.database_url)
-    return PostgresRepo(make_sessionmaker(engine))
+    sessionmaker = make_sessionmaker(engine)
+    repo = PostgresRepo(sessionmaker)
+    nonces = PostgresNonceStore(sessionmaker, ttl_seconds=settings.presence_window_seconds)
+    return repo, nonces, engine
 
 
 @contextlib.asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
-    app.state.repo = _build_repo(settings)
-    app.state.nonces = NonceStore(ttl_seconds=settings.presence_window_seconds)
+    repo, nonces, engine = _build_backends(settings)
+    app.state.repo = repo
+    app.state.nonces = nonces
     app.state.rate_limiter = RateLimiter(settings.rate_limit_per_minute)
     try:
         yield
     finally:
-        await app.state.repo.close()
+        await repo.close()
+        if engine is not None:
+            await engine.dispose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

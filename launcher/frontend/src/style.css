@@ -1,0 +1,71 @@
+/*
+ * The launcher palette is the client's palette. These values are Theme.java's navy and steel
+ * (moe.ramon.cryostasis.gui.Theme), translated from packed ARGB to CSS: the same deep blue
+ * backdrop, translucent slate panels, and single steel-blue accent, so the launcher and the
+ * in-game screens read as one product. A retheme stays a single-file edit here, as it is there.
+ */
+:root {
+  --bg-top: #0e1b2b;
+  --bg-bottom: #05090f;
+  --panel: rgba(22, 31, 44, 0.82);
+  --panel-solid: #1a2433;
+  --header: #14202f;
+  --row: rgba(18, 26, 37, 0.78);
+  --row-hover: rgba(31, 44, 62, 0.9);
+  --field: #10161f;
+  --cell: #0b0f16;
+  --cell-border: #2a3648;
+  --accent: #5a8fc7;
+  --accent-dim: #2c4a63;
+  --text: #ffffff;
+  --subtext: #9aa7b8;
+  --ok: #78dc96;
+  --warn: #ebc878;
+  --error: #eb6e6e;
+  --radius: 8px;
+  --sidebar: 232px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg-bottom);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  color: var(--text);
+  background: none;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* Themed scrollbar, so the steel-blue look reaches even the scroll track. */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--accent-dim);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

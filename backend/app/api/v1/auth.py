@@ -22,7 +22,7 @@ router = APIRouter()
 @router.post("/auth/nonce")
 async def issue_nonce(nonces: NonceStore = Depends(get_nonces)) -> dict:
     # The client feeds this to Mojang's joinServer before posting the proof below.
-    return {"server_id": nonces.issue()}
+    return {"server_id": await nonces.issue()}
 
 
 @router.post("/auth/session")
@@ -31,7 +31,7 @@ async def prove_session(
     nonces: NonceStore = Depends(get_nonces),
     settings: Settings = Depends(settings_dep),
 ) -> dict:
-    if not nonces.consume(body.server_id):
+    if not await nonces.consume(body.server_id):
         raise HTTPException(status_code=400, detail="unknown or expired nonce")
 
     try:

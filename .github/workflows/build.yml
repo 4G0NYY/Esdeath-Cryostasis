@@ -66,15 +66,16 @@ jobs:
   # The installer is a separate artifact with its own toolchain: a static Go binary per
   # platform, so players do not need Java on PATH just to run the thing that installs the
   # mod. It reads the release it is attached to, so it must ship in the same release.
+  #
+  # It builds from the repository root, not installer/, because the download and profile logic
+  # now lives in the shared internal/engine package (the launcher shares it), and the engine's
+  # tests only run when `go test ./...` is invoked from the module root.
   installer:
     runs-on: ubuntu-latest
     # Serialized behind the mod build for two reasons: both jobs attach to the same release,
     # and action-gh-release creates it when absent, so running them together races to create
     # the same tag. It also stops installers shipping in a release whose mod jar failed.
     needs: build
-    defaults:
-      run:
-        working-directory: installer
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,8 +84,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-          # The installer has no third-party dependencies, so there is no go.sum and nothing
-          # to cache. Left on, the cache step fails looking for one.
+          # The root module (engine plus installer) has no third-party dependencies, so there is
+          # no go.sum and nothing to cache. The Wails dependency lives in the separate launcher
+          # module and never enters this build. Left on, the cache step fails looking for a sum.
           cache: false
 
       - name: Vet
@@ -96,10 +98,10 @@ jobs:
       - name: Build every platform
         run: |
           set -eu
-          mkdir -p dist
+          mkdir -p installer/dist
           build() {
             GOOS="$1" GOARCH="$2" CGO_ENABLED=0 \
-              go build -trimpath -ldflags '-s -w' -o "dist/$3" .
+              go build -trimpath -ldflags '-s -w' -o "installer/dist/$3" ./installer
           }
           build windows amd64 esdeath-installer-windows-amd64.exe
           build linux   amd64 esdeath-installer-linux-amd64
@@ -191,3 +193,93 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # The desktop launcher is a Wails app: a native GUI binary per platform, so unlike the
+  # cross-compiled installer it has to be built on each OS natively (each needs its own webview
+  # and toolchain). It lives in its own Go module (launcher/) with the Wails dependency, kept
+  # apart from the installer's dependency-free build. Like the installer it attaches to the
+  # release, so it is serialized behind the mod build to avoid racing to create the tag.
+  #
+  # New and not yet exercised by a real tag, so the first release may need a tweak here, the
+  # same caveat that applies to the backend image. fail-fast is off so one platform's failure
+  # does not cancel the others.
+  launcher:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows/amd64
+            asset: esdeath-launcher-windows-amd64.exe
+          - os: ubuntu-latest
+            platform: linux/amd64
+            asset: esdeath-launcher-linux-amd64
+          - os: macos-latest
+            platform: darwin/universal
+            asset: esdeath-launcher-macos.zip
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # bash everywhere, including the Windows runner (Git Bash), so one set of shell steps
+        # works across all three. Every step runs from the launcher module.
+        shell: bash
+        working-directory: launcher
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Linux is the only platform whose webview is not part of the OS: Wails renders through
+      # WebKitGTK, so its dev packages have to be installed before the build.
+      - name: Install Linux webview dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      # Pinned to the version the go.mod requires so the CLI and the runtime never drift apart.
+      - name: Install Wails
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      # wails build runs the frontend install and build first (per wails.json), then the Go
+      # build with the embedded dist, then packages the native binary into build/bin.
+      - name: Build
+        run: wails build -platform ${{ matrix.platform }} -clean -o esdeath-cryostasis-launcher
+
+      # Normalise the platform-specific output into one asset name. macOS produces a .app
+      # bundle (a directory), so it is zipped; the others are single binaries renamed in place.
+      - name: Package
+        run: |
+          set -eu
+          cd build/bin
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            zip -r "${{ matrix.asset }}" ./*.app
+          elif [ "${{ runner.os }}" = "Windows" ]; then
+            mv esdeath-cryostasis-launcher.exe "${{ matrix.asset }}"
+          else
+            mv esdeath-cryostasis-launcher "${{ matrix.asset }}"
+          fi
+
+      - name: Upload launcher artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: esdeath-launcher-${{ runner.os }}
+          path: launcher/build/bin/${{ matrix.asset }}
+          if-no-files-found: error
+
+      - name: Attach launcher to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: launcher/build/bin/${{ matrix.asset }}
+          fail_on_unmatched_files: true
