@@ -64,6 +64,14 @@ async def test_cosmetic_add_get_remove_roundtrip(client, uuid):
     assert (await client.get(f"/api/players/{uuid}/cosmetics")).json()["cosmetics"] == []
 
 
+async def test_add_unknown_cosmetic_rejected(client, uuid):
+    # A slug outside the catalogue is a 400, and nothing is written to the active set, so
+    # the active set stays a subset of CATALOGUE.
+    r = await client.post(f"/api/players/{uuid}/cosmetics", json={"cosmetic": "notarealone"})
+    assert r.status_code == 400
+    assert (await client.get(f"/api/players/{uuid}/cosmetics")).json()["cosmetics"] == []
+
+
 async def test_has_cosmetic_is_catalogue_check(client, uuid):
     # Delta §9: hasThePlayerTheCosmetic is now a catalogue membership check, true for any
     # real cosmetic even when the player has not selected it.

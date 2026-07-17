@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from app.api.deps import get_repo, require_caller, settings_dep
@@ -72,6 +72,11 @@ async def get_cosmetics(
 async def add_cosmetic(
     body: CosmeticBody, caller: str = Depends(require_caller), repo: Repo = Depends(get_repo)
 ) -> dict:
+    # Only catalogue members are addable: the active set must stay a subset of CATALOGUE so
+    # the client never receives a slug it has no model/texture for. body.cosmetic is already
+    # lowercased by CosmeticBody, matching the catalogue keys.
+    if body.cosmetic not in CATALOGUE:
+        raise HTTPException(status_code=400, detail=f"unknown cosmetic: {body.cosmetic}")
     ok = await repo.add_cosmetic(caller, body.cosmetic)
     return {"ok": ok}
 
