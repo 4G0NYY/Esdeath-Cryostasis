@@ -1,5 +1,6 @@
 package moe.ramon.cryostasis.render;
 
+import moe.ramon.cryostasis.hud.HudColors;
 import moe.ramon.cryostasis.module.ModuleManager;
 import moe.ramon.cryostasis.modules.render.BlockOutlineModule;
 import moe.ramon.cryostasis.modules.render.HitboxModule;
@@ -44,7 +45,8 @@ public final class WorldRenderHooks {
 			}
 			Vec3 cam = context.camera().getPosition();
 			VertexConsumer lines = context.consumers().getBuffer(RenderType.lines());
-			float[] c = RenderUtil.argbToFloats(hitbox.getColor());
+			int argb = HudColors.isRainbow() ? HudColors.rainbow(0.0f) : hitbox.getColor();
+			float[] c = RenderUtil.argbToFloats(argb);
 			double expand = hitbox.getExpand();
 
 			pose.pushPose();
@@ -75,7 +77,8 @@ public final class WorldRenderHooks {
 
 			Vec3 cam = context.camera().getPosition();
 			VertexConsumer lines = context.consumers().getBuffer(RenderType.lines());
-			float[] c = RenderUtil.argbToFloats(blockOutline.getColor());
+			int argb = HudColors.isRainbow() ? HudColors.rainbow(0.5f) : blockOutline.getColor();
+			float[] c = RenderUtil.argbToFloats(argb);
 
 			pose.pushPose();
 			pose.translate(pos.getX() - cam.x, pos.getY() - cam.y, pos.getZ() - cam.z);

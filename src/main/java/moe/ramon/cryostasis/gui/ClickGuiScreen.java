@@ -199,6 +199,11 @@ public final class ClickGuiScreen extends Screen {
 				}
 				int color = module.isEnabled() ? COLOR_ENABLED : COLOR_TEXT;
 				context.drawString(font, module.getName(), x + 6, rowY + 3, color);
+				// Show the toggle key on the row so a bind is visible at a glance.
+				if (module.hasKeybind()) {
+					String key = keyName(module.getKeyCode());
+					context.drawString(font, key, x + PANEL_WIDTH - font.width(key) - 4, rowY + 3, COLOR_SUBTEXT);
+				}
 				rowY += ROW_HEIGHT;
 
 				if (expanded.contains(module)) {

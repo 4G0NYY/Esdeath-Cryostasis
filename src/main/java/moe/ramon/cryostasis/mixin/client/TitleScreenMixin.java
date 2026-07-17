@@ -47,13 +47,21 @@ public abstract class TitleScreenMixin extends Screen {
 			ResourceLocation.fromNamespaceAndPath("esdeath-cryostasis", "textures/gui/title/background.png");
 	private static final Component WORDMARK = Component.literal("ESDEATH: CRYOSTASIS");
 
-	private static final int PANEL_WIDTH = 216;
-	private static final int BUTTON_WIDTH = 200;
 	private static final int BUTTON_HEIGHT = 20;
 	private static final int BUTTON_GAP = 4;
 	private static final int GROUP_GAP = 16;
+	private static final int MIN_BUTTON_WIDTH = 74;
+	private static final int RIGHT_MARGIN = 12;
+	private static final int EDGE_PAD = 8;
 	private static final float WORDMARK_SCALE = 2.0F;
 	private static final int TOP_MARGIN = 12;
+
+	// Left edge of the wallpaper's angled metal strip as a fraction of screen width, at the
+	// top and bottom of the screen. Buttons hug just right of this diagonal so they sit on
+	// the metal instead of spilling into the dark. These match the shipped background.png;
+	// a different wallpaper needs different values.
+	private static final float METAL_TOP_FRAC = 0.83F;
+	private static final float METAL_BOTTOM_FRAC = 0.74F;
 
 	// Menu buttons stacked top to bottom in this order; matched by their localized label.
 	private static final String[] MAIN_ORDER = {
@@ -62,9 +70,6 @@ public abstract class TitleScreenMixin extends Screen {
 
 	@Inject(method = "init", at = @At("TAIL"))
 	private void esdeath$layout(CallbackInfo ci) {
-		int panelX = this.width - PANEL_WIDTH;
-		int buttonX = panelX + (PANEL_WIDTH - BUTTON_WIDTH) / 2;
-
 		List<Button> main = new ArrayList<>();
 		List<SpriteIconButton> icons = new ArrayList<>();
 		PlainTextButton copyright = null;
@@ -90,15 +95,13 @@ public abstract class TitleScreenMixin extends Screen {
 			if (button.getMessage().getString().equals(optionsLabel)) {
 				y += GROUP_GAP;
 			}
-			button.setX(buttonX);
-			button.setY(y);
-			button.setWidth(BUTTON_WIDTH);
+			esdeath$placeOnMetal(button, y, BUTTON_HEIGHT);
 			y += BUTTON_HEIGHT + BUTTON_GAP;
 		}
 
 		// Language and accessibility icons sit in a right-aligned row beneath the stack.
 		int iconY = y + 4;
-		int iconX = buttonX + BUTTON_WIDTH;
+		int iconX = this.width - RIGHT_MARGIN;
 		for (SpriteIconButton icon : icons) {
 			iconX -= icon.getWidth() + 4;
 			icon.setX(iconX);
@@ -130,6 +133,25 @@ public abstract class TitleScreenMixin extends Screen {
 		return ordered;
 	}
 
+	/**
+	 * Position and size a button so its left edge sits just right of the wallpaper's angled
+	 * metal strip at that row's height, extending to the right margin. The strip is wider
+	 * lower down, so lower buttons are wider. Width is floored so the labels always fit.
+	 */
+	private void esdeath$placeOnMetal(Button button, int rowY, int rowHeight) {
+		float centerFrac = (rowY + rowHeight / 2.0F) / this.height;
+		float edgeFrac = METAL_TOP_FRAC - (METAL_TOP_FRAC - METAL_BOTTOM_FRAC) * centerFrac;
+		int edgeX = Math.round(this.width * edgeFrac) + EDGE_PAD;
+		int buttonWidth = this.width - edgeX - RIGHT_MARGIN;
+		if (buttonWidth < MIN_BUTTON_WIDTH) {
+			buttonWidth = MIN_BUTTON_WIDTH;
+		}
+		int buttonX = this.width - buttonWidth - RIGHT_MARGIN;
+		button.setX(buttonX);
+		button.setY(rowY);
+		button.setWidth(buttonWidth);
+	}
+
 	@Inject(method = "render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V", at = @At("HEAD"), cancellable = true)
 	private void esdeath$render(GuiGraphics graphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		esdeath$background(graphics);
@@ -157,10 +179,11 @@ public abstract class TitleScreenMixin extends Screen {
 	}
 
 	private void esdeath$brand(GuiGraphics graphics) {
-		int centerX = (this.width - PANEL_WIDTH) / 2;
+		// Centered horizontally under the logo (which is baked into the wallpaper near the
+		// screen center) and dropped below it so the two do not overlap.
 		Matrix3x2fStack pose = graphics.pose();
 		pose.pushMatrix();
-		pose.translate(centerX, this.height * 0.60F);
+		pose.translate(this.width / 2.0F, this.height * 0.68F);
 		pose.scale(WORDMARK_SCALE, WORDMARK_SCALE);
 		graphics.drawCenteredString(this.font, WORDMARK, 0, 0, Theme.TEXT);
 		pose.popMatrix();
