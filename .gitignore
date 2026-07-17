@@ -1,0 +1,37 @@
+# Local Only
+Todo.md
+
+# The original client jar bundles the whole Minecraft client. Per the project ground
+# rules no Minecraft code lives in this repository, so keep it local for reference only.
+old_esdeath_client/
+
+# Gradle
+.gradle/
+build/
+out/
+classes/
+
+# Loom / Fabric
+run/
+*.log
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+
+# Backend dev artifacts
+backend/out/
+backend/*.log
+backend/dev-data.json
+backend/backend-data.json
+
+# OS
+.DS_Store
+Thumbs.db

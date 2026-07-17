@@ -1,0 +1,32 @@
+{
+	"schemaVersion": 1,
+	"id": "esdeath-cryostasis",
+	"version": "${version}",
+	"name": "Esdeath: Cryostasis",
+	"description": "A modern rebuild of the Esdeath Client as a Fabric mod for Minecraft 1.21.x. Quality-of-life HUD modules and cosmetics, client side only.",
+	"authors": [
+		"txb1",
+		"Cryostasis contributors"
+	],
+	"contact": {
+		"homepage": "https://ramon.moe",
+		"sources": "https://github.com/4G0NYY/Esdeath-Cryostasis"
+	},
+	"license": "ARR",
+	"icon": "assets/esdeath-cryostasis/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"moe.ramon.cryostasis.EsdeathCryostasisClient"
+		]
+	},
+	"mixins": [
+		"esdeath-cryostasis.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.17.0",
+		"minecraft": "~1.21.8",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

@@ -1,0 +1,17 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "moe.ramon.cryostasis.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"client.AbstractContainerScreenMixin",
+		"client.GameRendererMixin",
+		"client.KeyboardMixin",
+		"client.MouseMixin",
+		"client.MultiPlayerGameModeMixin",
+		"client.TitleScreenMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

@@ -1,0 +1,49 @@
+name: build
+
+# Builds the Fabric mod jar on every push and pull request, and attaches the jar to a
+# GitHub Release when a version tag is pushed. The release artifact is the mod jar only,
+# never a repackaged Minecraft jar, per the project ground rules.
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: esdeath-cryostasis
+          # Exclude the sources jar so the artifact is the runnable mod jar only.
+          path: build/libs/*.jar
+          if-no-files-found: error
+
+      - name: Attach jar to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/libs/*[!sources].jar
+          fail_on_unmatched_files: true
