@@ -4,9 +4,10 @@ This document is the design for the production backend. It builds on `docs/backe
 which records the recovered wire protocol and the REST redesign; that document owns the
 contract, this one owns the implementation shape.
 
-The current dev instance (`backend/`, Java plus the JDK HTTP server) stays until this reaches
-parity. Both speak the same contract, so the client switches between them with
-`-Dcryostasis.api`.
+This design is now implemented in `backend/`. The earlier Java dev instance (JDK HTTP server
+plus Gson) has been removed, so the FastAPI service is the only backend. The client points
+at it with `-Dcryostasis.api`; with no environment set it boots the in-memory backend with
+auth off, which is the mode the client is smoke-tested against.
 
 ## 1. Decisions this design rests on
 
@@ -141,7 +142,10 @@ Against `docs/backend-api.md`:
 
 **Versioning snag:** the client hardcodes `/api` (`CosmeticService`, via the
 `cryostasis.api` system property). Introducing `/api/v1` breaks the shipped client unless
-`/api` stays a permanent alias. Decide before the first deploy, not after.
+`/api` stays a permanent alias. Decided: routes are mounted at `/api` with no version
+segment in the URL. The version seam lives in the code (`app/api/v1/`), so a future v2 would
+add a second package and mount it while `/api` stays pinned to whichever version the live
+client needs. This keeps the shipped client working with no alias to maintain.
 
 ## 10. Deployment and testing
 
