@@ -63,13 +63,21 @@ jobs:
           files: dist/*.jar
           fail_on_unmatched_files: true
 
-  # The installer is a separate artifact with its own toolchain: a static Go binary per
-  # platform, so players do not need Java on PATH just to run the thing that installs the
-  # mod. It reads the release it is attached to, so it must ship in the same release.
+  # The setup installer is a separate artifact: a static Go binary that installs the desktop
+  # launcher as a regular Windows app (into the user's programs folder, with shortcuts and an
+  # Add/Remove Programs entry) and then the launcher installs the mod. It needs no Java, and no
+  # Inno Setup or other toolchain — just `go build`. Windows only, because the Add/Remove
+  # Programs install-and-uninstall model it implements has no meaning elsewhere; Linux and macOS
+  # users run the launcher binary directly.
   #
-  # It builds from the repository root, not installer/, because the download and profile logic
-  # now lives in the shared internal/engine package (the launcher shares it), and the engine's
-  # tests only run when `go test ./...` is invoked from the module root.
+  # At the player's machine it downloads the launcher from the newest release, so it must ship
+  # in the same release the launcher job attaches to, hence `needs: build` and the serialization.
+  #
+  # It builds from the repository root, not installer/, because the download and release logic
+  # lives in the shared internal/engine package (the launcher shares it), and the engine's tests
+  # only run when `go test ./...` is invoked from the module root. Vet and test run on this Linux
+  # runner and still cover the installer: its Windows-only logic sits behind build tags with a
+  # compiled non-Windows stub, so the package builds and is vetted here before it is cross-built.
   installer:
     runs-on: ubuntu-latest
     # Serialized behind the mod build for two reasons: both jobs attach to the same release,
@@ -95,18 +103,15 @@ jobs:
       - name: Test
         run: go test ./...
 
-      - name: Build every platform
+      # Windows amd64 only: the setup binary installs a Windows desktop app. Cross-built from
+      # the Linux runner (CGO_ENABLED=0, pure Go), so no Windows runner is needed just for this.
+      - name: Build the Windows setup installer
         run: |
           set -eu
           mkdir -p installer/dist
-          build() {
-            GOOS="$1" GOARCH="$2" CGO_ENABLED=0 \
-              go build -trimpath -ldflags '-s -w' -o "installer/dist/$3" ./installer
-          }
-          build windows amd64 esdeath-installer-windows-amd64.exe
-          build linux   amd64 esdeath-installer-linux-amd64
-          build darwin  amd64 esdeath-installer-macos-intel
-          build darwin  arm64 esdeath-installer-macos-apple-silicon
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 \
+            go build -trimpath -ldflags '-s -w' -o installer/dist/EsdeathCryostasisSetup.exe ./installer
+          ls -1 installer/dist
 
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4

@@ -53,3 +53,31 @@ func ModAsset(release *Release) (*Asset, error) {
 	}
 	return nil, fmt.Errorf("release %s has no %s*.jar asset", release.TagName, modArtifactPrefix)
 }
+
+// LauncherAsset picks the desktop launcher binary for the given OS out of a release. CI names
+// the launcher assets esdeath-launcher-windows-amd64.exe, esdeath-launcher-linux-amd64, and
+// esdeath-launcher-macos.zip (see the launcher job in build.yml), so match on the launcher
+// name plus the OS token and rule out the installer and the mod jars. goos is a runtime.GOOS
+// value; darwin maps to the "macos" token the CI asset uses.
+func LauncherAsset(release *Release, goos string) (*Asset, error) {
+	osToken := goos
+	if goos == "darwin" {
+		osToken = "macos"
+	}
+	for i := range release.Assets {
+		name := strings.ToLower(release.Assets[i].Name)
+		if !strings.Contains(name, "launcher") {
+			continue
+		}
+		// The setup installer also carries "esdeath" and, on some names, would otherwise slip
+		// through; it never contains "launcher", so the check above already excludes it. This
+		// guard is belt-and-braces against a future asset that pairs the two words.
+		if strings.Contains(name, "installer") || strings.Contains(name, "setup") {
+			continue
+		}
+		if strings.Contains(name, osToken) {
+			return &release.Assets[i], nil
+		}
+	}
+	return nil, fmt.Errorf("release %s has no launcher asset for %s", release.TagName, goos)
+}

@@ -219,6 +219,45 @@ func TestModAsset(t *testing.T) {
 	}
 }
 
+// LauncherAsset is what the setup installer downloads, so it must pick the launcher for the
+// right OS and never mistake the installer, the mod jar, or another platform's launcher for it.
+func TestLauncherAsset(t *testing.T) {
+	release := &Release{
+		TagName: "v0.5.1",
+		Assets: []Asset{
+			{Name: "EsdeathCryostasisSetup.exe"},
+			{Name: "esdeath-cryostasis-0.5.1.jar"},
+			{Name: "esdeath-launcher-windows-amd64.exe"},
+			{Name: "esdeath-launcher-linux-amd64"},
+			{Name: "esdeath-launcher-macos.zip"},
+		},
+	}
+
+	cases := map[string]string{
+		"windows": "esdeath-launcher-windows-amd64.exe",
+		"linux":   "esdeath-launcher-linux-amd64",
+		"darwin":  "esdeath-launcher-macos.zip", // darwin maps to the "macos" asset token
+	}
+	for goos, want := range cases {
+		asset, err := LauncherAsset(release, goos)
+		if err != nil {
+			t.Fatalf("%s: %v", goos, err)
+		}
+		if asset.Name != want {
+			t.Errorf("%s: picked %q, want %q", goos, asset.Name, want)
+		}
+	}
+
+	// A release that carries only the setup installer and the jar has no launcher to install.
+	bare := &Release{TagName: "v0.5.1", Assets: []Asset{
+		{Name: "EsdeathCryostasisSetup.exe"},
+		{Name: "esdeath-cryostasis-0.5.1.jar"},
+	}}
+	if _, err := LauncherAsset(bare, "windows"); err == nil {
+		t.Error("want an error when the release has no launcher asset, got nil")
+	}
+}
+
 // mergeJvmProperty is how the backend override reaches the client, so its three cases (fresh,
 // replace, preserve) are the contract the launcher depends on.
 func TestMergeJvmProperty(t *testing.T) {

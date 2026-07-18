@@ -66,6 +66,12 @@ func getXML(url string, target any) error {
 	return xml.NewDecoder(body).Decode(target)
 }
 
+// DownloadTo fetches url to dest with the same safe-write path installJar uses: a temp file in
+// the destination directory renamed into place, so a half-finished download never appears under
+// the real name. Exported for the setup installer, which downloads the launcher binary rather
+// than a mod jar but wants exactly that guarantee.
+func DownloadTo(url, dest string) error { return downloadFile(url, dest) }
+
 // downloadFile writes a URL to disk through a temp file in the destination directory, so a
 // half-finished download can never be left behind under the real name. Staging in the same
 // directory keeps the final step a rename on one filesystem.

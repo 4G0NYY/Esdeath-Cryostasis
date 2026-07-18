@@ -13,13 +13,6 @@ import (
 //go:embed assets/esdeath-ascii.txt
 var asciiArt string
 
-// cliProgress adapts the engine's Progress seam onto the installer's colored line printers, so
-// the shared engine reports detail through the same look as every other line this tool prints.
-type cliProgress struct{}
-
-func (cliProgress) Info(format string, args ...any) { info(format, args...) }
-func (cliProgress) Warn(format string, args ...any) { warn(format, args...) }
-
 // ANSI sequences. Written as truecolor because the banner is a single flat ice-blue and
 // the 16-color palette has nothing close enough to it.
 const (
@@ -42,7 +35,7 @@ func banner() {
 	}
 	fmt.Print(reset)
 	fmt.Println()
-	fmt.Printf("  %s%sEsdeath: Cryostasis Installer%s\n", bold, iceBlue, reset)
+	fmt.Printf("  %s%sEsdeath: Cryostasis Setup%s\n", bold, iceBlue, reset)
 	fmt.Printf("  %s%s%s\n", deepBlue, engine.RepoURL, reset)
 	fmt.Println()
 }

@@ -29,46 +29,36 @@ marked as such in `Todo.md`. See it for the full roadmap and per-item progress.
 
 ## Installing
 
-### With the launcher (recommended)
+### Windows: the setup installer (recommended)
 
-The desktop launcher (`launcher/`, attached to each
-[release](https://github.com/4G0NYY/Esdeath-Cryostasis/releases/latest)) installs and updates
-the mod for you, and adds one thing the CLI installer cannot: a Settings field to point the
-client at any backend, defaulting to the hosted `cryostasis.ramon.moe/api`. Self-hosting the
-open-source backend? Enter your instance there and the launcher pins it into the launch
-profile. It then hands off to the official Minecraft launcher to play. See
+Download `EsdeathCryostasisSetup.exe` from the
+[latest release](https://github.com/4G0NYY/Esdeath-Cryostasis/releases/latest) and run it.
+It installs the desktop launcher as a regular Windows app — into your programs folder, with a
+Start Menu (and Desktop) shortcut and an entry in **Add/Remove Programs** — with no
+administrator rights required. That single download is all you need; the launcher takes over
+from there and installs and updates the mod itself.
+
+Open the launcher, and it installs Fabric, Fabric API, and the newest mod jar into your
+`.minecraft`, writes the "Esdeath Cryostasis" launch profile, and hands off to the official
+Minecraft launcher to play. It also adds one thing nothing else does: a Settings field to point
+the client at any backend, defaulting to the hosted `cryostasis.ramon.moe/api` — self-hosting
+the open-source backend? Enter your instance there and it pins that into the profile. See
 [`launcher/README.md`](launcher/README.md).
 
-### With the installer
-
-For a scripted or headless setup, the command-line installer does the install and update side
-without the GUI or the backend picker.
-
-Grab the installer for your platform from the
-[latest release](https://github.com/4G0NYY/Esdeath-Cryostasis/releases/latest) and run it:
-
-| Platform | File |
-| --- | --- |
-| Windows | `esdeath-installer-windows-amd64.exe` |
-| Linux | `esdeath-installer-linux-amd64` |
-| macOS (Apple silicon) | `esdeath-installer-macos-apple-silicon` |
-| macOS (Intel) | `esdeath-installer-macos-intel` |
-
-It checks that Minecraft Java Edition is present, offers to install Fabric if it is
-missing, installs Fabric API (the mod requires it), downloads the newest mod jar into your
-`mods` folder, and adds an "Esdeath Cryostasis" profile to the official launcher. Then pick
-that profile and hit Play.
-
-Re-run it any time to update: it pulls the newest mod jar and Fabric API, removes the
-versions they replace, and leaves every other mod alone. It is a single static binary and
-needs no Java of its own, though installing Fabric does require a JVM somewhere (the
-launcher's bundled runtime counts).
+The setup installer is idempotent: run it again any time to pull the newest launcher over the
+top of the old one. To remove everything, use **Add/Remove Programs** (or run the installer with
+`--uninstall`); your launcher settings under `AppData` are left in place.
 
 Useful flags:
 
 - `-y` answer yes to every prompt, for unattended runs.
-- `-dir <path>` point at `.minecraft` if it is not in the default location.
-- `-mc <version>` target a Minecraft version other than 1.21.8.
+- `--uninstall` remove the launcher, shortcuts, and registry entry (what Add/Remove Programs calls).
+- `--no-desktop-shortcut` skip the Desktop shortcut.
+- `--no-launch` do not start the launcher after installing.
+
+On Linux and macOS there is no setup installer — the "install as a desktop app" model is
+Windows-specific. Download the launcher binary for your platform from the release and run it
+directly; it does the same mod install and backend setup.
 
 ### By hand
 
@@ -80,8 +70,8 @@ not required.
 2. Drop the `esdeath-cryostasis-<version>.jar` into your `mods` folder.
 3. Launch the game and press Right Shift to open the click GUI.
 
-Prebuilt jars and installers are attached to tagged GitHub Releases; see the `build`
-workflow.
+Prebuilt jars, the setup installer, and the launcher binaries are attached to tagged GitHub
+Releases; see the `build` workflow.
 
 ## Target stack
 
@@ -123,7 +113,8 @@ settings, and drag panel headers to rearrange.
   - `service/` shared services such as the click tracker.
   - `mixin/client/` game hooks (mouse and keyboard).
   - `modules/` concrete modules.
-- `installer/` the standalone Go CLI installer (no dependencies, one binary per platform).
+- `installer/` the Windows setup installer (Go, no dependencies): installs the launcher as a
+  desktop app with Add/Remove Programs support, and uninstalls it.
 - `docs/` recovered specification and backend API design.
 
 ## Credits
