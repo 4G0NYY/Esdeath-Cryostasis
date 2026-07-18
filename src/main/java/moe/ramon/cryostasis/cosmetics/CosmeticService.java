@@ -82,6 +82,58 @@ public final class CosmeticService {
 		}
 	}
 
+	/**
+	 * Activate a cosmetic for a player. Updates the cache optimistically so the change shows in
+	 * the menu preview at once, then posts it to the backend without blocking. The entry is
+	 * marked stale on completion so the next read re-syncs with the server, which quietly reverts
+	 * the optimistic change if the write did not take.
+	 */
+	public void activate(UUID player, String cosmetic) {
+		setLocalActive(player, cosmetic, true);
+		String key = cosmetic.toLowerCase();
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(baseUrl + "/players/" + player + "/cosmetics"))
+				.timeout(Duration.ofSeconds(5))
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString("{\"cosmetic\":\"" + key + "\"}"))
+				.build();
+		send(player, request);
+	}
+
+	/** Deactivate a cosmetic for a player. Optimistic and non-blocking, mirroring {@link #activate}. */
+	public void deactivate(UUID player, String cosmetic) {
+		setLocalActive(player, cosmetic, false);
+		String key = cosmetic.toLowerCase();
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(baseUrl + "/players/" + player + "/cosmetics/" + key))
+				.timeout(Duration.ofSeconds(5))
+				.DELETE()
+				.build();
+		send(player, request);
+	}
+
+	private void send(UUID player, HttpRequest request) {
+		http.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+				.whenComplete((ok, error) -> invalidate(player));
+	}
+
+	/**
+	 * Optimistically flip a cosmetic in the cached active set so the render reflects the choice
+	 * before the network round-trip returns. Rebuilds the set into a new immutable {@link Active}
+	 * so readers on the render thread never see a half-mutated set.
+	 */
+	private void setLocalActive(UUID player, String cosmetic, boolean active) {
+		Entry entry = cache.computeIfAbsent(player, k -> new Entry());
+		String key = cosmetic.toLowerCase();
+		Set<String> next = new LinkedHashSet<>(entry.data.cosmetics());
+		if (active) {
+			next.add(key);
+		} else {
+			next.remove(key);
+		}
+		entry.data = new Active(next, entry.data.cape());
+	}
+
 	private void refresh(UUID player, Entry entry) {
 		entry.loading = true;
 		HttpRequest request = HttpRequest.newBuilder()

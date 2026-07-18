@@ -19,6 +19,8 @@ import moe.ramon.cryostasis.modules.misc.DiscordPresenceModule;
 import moe.ramon.cryostasis.modules.misc.TabGuiModule;
 import moe.ramon.cryostasis.modules.misc.TakeAllModule;
 import moe.ramon.cryostasis.modules.movement.AutoPathModule;
+import moe.ramon.cryostasis.modules.movement.NoCobwebModule;
+import moe.ramon.cryostasis.modules.movement.NoSoulsandModule;
 import moe.ramon.cryostasis.modules.movement.SafeWalkModule;
 import moe.ramon.cryostasis.modules.movement.SpiderModule;
 import moe.ramon.cryostasis.modules.movement.ZootModule;
@@ -29,6 +31,9 @@ import moe.ramon.cryostasis.modules.player.ToggleSprintModule;
 import moe.ramon.cryostasis.modules.render.BlockOutlineModule;
 import moe.ramon.cryostasis.modules.render.CleanChatModule;
 import moe.ramon.cryostasis.modules.render.HitboxModule;
+import moe.ramon.cryostasis.modules.render.NightvisionModule;
+import moe.ramon.cryostasis.modules.render.NoBlindModule;
+import moe.ramon.cryostasis.modules.render.XrayModule;
 import moe.ramon.cryostasis.modules.render.ZoomModule;
 import moe.ramon.cryostasis.cosmetics.render.CosmeticLayer;
 import moe.ramon.cryostasis.cosmetics.render.CosmeticModels;
@@ -117,11 +122,16 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new AutoPathModule());
 		modules.register(new ZootModule());
 		modules.register(new SpiderModule());
+		modules.register(new NoCobwebModule());
+		modules.register(new NoSoulsandModule());
 		// Render
 		modules.register(new HitboxModule());
 		modules.register(new BlockOutlineModule());
 		modules.register(new ZoomModule());
 		modules.register(new CleanChatModule());
+		modules.register(new XrayModule());
+		modules.register(new NoBlindModule());
+		modules.register(new NightvisionModule());
 		// Combat
 		modules.register(new MoreParticlesModule());
 		modules.register(new SharpnessModule());

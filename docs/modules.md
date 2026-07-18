@@ -27,6 +27,12 @@ resize the window.
 | Module | What it does | Settings |
 |---|---|---|
 | ToggleSprint | Sprints automatically while you move forward | none |
+| NoCobweb | Walk through cobwebs at full speed, ignoring their slowdown | none |
+| NoSoulsand | Cross soul sand at full speed, ignoring its slowdown | none |
+
+NoCobweb and NoSoulsand only touch the local player. In singleplayer they cover the
+integrated server too, so there is no rubber-banding; on a fair-play multiplayer server the
+server still applies the slowdown, so use them with that in mind.
 
 ## Render
 
@@ -35,6 +41,18 @@ resize the window.
 | Hitbox | Outlines entity hitboxes | Color, Expand amount |
 | BlockOutline | Recolors the block selection outline | Color |
 | Zoom | Zooms in by narrowing your field of view while enabled | Factor |
+| Xray | Reveals selected ores and blocks through terrain, hiding everything else | Per-material toggles (Coal, Iron, Copper, Gold, Redstone, Lapis, Diamond, Emerald, Quartz, Netherite, Amethyst), Containers, Spawners, Vaults, Suspicious, and an Extra field for custom block ids |
+| NoBlind | Ignores the blindness effect, keeping vision clear | none |
+| Nightvision | Keeps the world bright like the night vision potion and ignores darkness | none |
+
+Xray ships with a sensible default selection (the valuable ores plus containers, spawners,
+and vaults; coal and suspicious blocks are off to cut clutter). Toggle materials in the click
+GUI, or list extra blocks by id in the Extra setting, comma separated, for example
+`minecraft:beacon, minecraft:reinforced_deepslate`. Toggling Xray or changing its selection
+rebuilds the visible chunks so the change shows at once.
+
+Nightvision also themes the sky: while Rainbow mode is on, the horizon sweeps through the
+same rainbow the HUD uses, so the world matches the client theme.
 
 ## Combat feedback
 
@@ -63,11 +81,18 @@ cosmetics too, not just your own. The client fetches each visible player's activ
 cosmetics from the backend and caches them.
 
 Currently rebuilt: TopHat, Halo, Bandana. More are planned (Wings, Tail, Rabbit ears,
-Reifen, Susanoo, Rotate, Stripes, and capes). An in-game menu to preview and select owned
-cosmetics is planned.
+Reifen, Susanoo, Rotate, Stripes, and capes).
+
+### Cosmetics menu
+
+Open it in world with Right Ctrl. It previews your own player, rotating to follow the cursor,
+and lists every cosmetic the client can render. Click a row to toggle that cosmetic on or off:
+the preview updates at once and the change is saved to the backend in the background. Because
+the preview reuses the same renderer other players see, what you set here is what they see too.
+The menu needs a world to preview a player, so it only opens once you are in game.
 
 ## Opening the menu
 
-The click GUI key defaults to Right Shift. Module hotkeys can be set per module in the GUI
-(right click a module to expand it, then bind a key). Hotkeys never fire while a screen is
-open, so typing in chat is safe.
+The click GUI key defaults to Right Shift, and the cosmetics menu to Right Ctrl. Module hotkeys
+can be set per module in the GUI (right click a module to expand it, then bind a key). Hotkeys
+never fire while a screen is open, so typing in chat is safe.
