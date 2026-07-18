@@ -18,8 +18,13 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
  */
 @Mixin(ServerboundMovePlayerPacket.class)
 public abstract class ServerboundMovePlayerPacketMixin {
+	// Must be static: this handler injects at HEAD of the constructor, before the super() call,
+	// where `this` is not yet constructed. Mixin rejects a non-static @ModifyVariable in that
+	// position, and the failure cascades into Fabric's VanillaPacketTypes.<clinit>, breaking all
+	// networking (world join/create) with NoClassDefFoundError. The body uses only static
+	// accessors, so static is a clean fit.
 	@ModifyVariable(method = "<init>", at = @At("HEAD"), argsOnly = true, ordinal = 0)
-	private boolean cryostasis$noFall(boolean onGround) {
+	private static boolean cryostasis$noFall(boolean onGround) {
 		if (onGround) {
 			// Already grounded: nothing to spoof.
 			return true;
