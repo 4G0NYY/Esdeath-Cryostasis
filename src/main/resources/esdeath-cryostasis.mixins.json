@@ -6,13 +6,16 @@
 	"client": [
 		"client.AbstractContainerScreenMixin",
 		"client.AbstractSelectionListMixin",
+		"client.ChatComponentMixin",
 		"client.GameRendererMixin",
 		"client.GuiGraphicsMixin",
 		"client.KeyboardMixin",
+		"client.LivingEntityMixin",
 		"client.MouseMixin",
 		"client.MultiPlayerGameModeMixin",
 		"client.PlayerMixin",
 		"client.ScreenMixin",
+		"client.ServerboundMovePlayerPacketMixin",
 		"client.TakeAllMixin",
 		"client.TitleScreenMixin"
 	],

@@ -2,6 +2,7 @@ package moe.ramon.cryostasis.modules.misc;
 
 import moe.ramon.cryostasis.Cryostasis;
 import moe.ramon.cryostasis.gui.Theme;
+import moe.ramon.cryostasis.hud.HudColors;
 import moe.ramon.cryostasis.module.Category;
 import moe.ramon.cryostasis.module.Module;
 import net.minecraft.client.gui.Font;
@@ -21,8 +22,7 @@ import java.util.List;
  * and lets everything else fall through to normal module hotkeys.
  */
 public final class TabGuiModule extends Module {
-	private static final int X = 4;
-	private static final int Y = 24;
+	private static final int MARGIN = 4;
 	private static final int ROW_HEIGHT = 11;
 	private static final int COLUMN_WIDTH = 74;
 
@@ -92,29 +92,50 @@ public final class TabGuiModule extends Module {
 	public void render(GuiGraphics context) {
 		Font font = mc.font;
 		Category[] categories = Category.values();
+		List<Module> modules = inModules ? currentModules() : null;
 
-		int y = Y;
+		// Anchor to the bottom-right corner so the menu never covers the top-left HUD stack (FPS,
+		// CPS, coordinates). The category column is the rightmost; the module column, when open,
+		// grows to its left, so both stay on screen. Both columns share a top edge chosen so the
+		// taller of the two just reaches the bottom margin, which lets the block grow upward
+		// instead of spilling off the bottom.
+		int screenWidth = mc.getWindow().getGuiScaledWidth();
+		int screenHeight = mc.getWindow().getGuiScaledHeight();
+		int moduleRows = modules != null ? modules.size() : 0;
+		int maxRows = Math.max(categories.length, moduleRows);
+		int topY = screenHeight - MARGIN - maxRows * ROW_HEIGHT;
+		int categoryX = screenWidth - MARGIN - COLUMN_WIDTH;
+
+		int y = topY;
 		for (int i = 0; i < categories.length; i++) {
 			boolean selected = i == categoryIndex && !inModules;
 			boolean active = i == categoryIndex;
-			drawRow(context, font, X, y, categories[i].getDisplayName(),
-					selected ? Theme.ACCENT : Theme.HEADER, active ? Theme.TEXT : Theme.SUBTEXT);
+			drawRow(context, font, categoryX, y, categories[i].getDisplayName(),
+					selected ? accent(i) : Theme.HEADER, active ? Theme.TEXT : Theme.SUBTEXT);
 			y += ROW_HEIGHT;
 		}
 
-		if (inModules) {
-			List<Module> modules = currentModules();
-			int moduleX = X + COLUMN_WIDTH + 2;
-			int moduleY = Y + categoryIndex * ROW_HEIGHT;
+		if (modules != null) {
+			int moduleX = categoryX - 2 - COLUMN_WIDTH;
+			int moduleY = topY;
 			for (int i = 0; i < modules.size(); i++) {
 				Module module = modules.get(i);
 				boolean selected = i == moduleIndex;
-				int textColor = module.isEnabled() ? Theme.ACCENT : Theme.TEXT;
+				int textColor = module.isEnabled() ? accent(i) : Theme.TEXT;
 				drawRow(context, font, moduleX, moduleY, module.getName(),
 						selected ? Theme.ROW_HOVER : Theme.ROW, textColor);
 				moduleY += ROW_HEIGHT;
 			}
 		}
+	}
+
+	/**
+	 * The highlight color for row {@code index}. Normally the steel accent, but when Rainbow mode
+	 * is on it reads through {@link HudColors} so the menu sweeps in step with the rest of the
+	 * HUD; the per-row offset spreads the sweep into a gradient down the column.
+	 */
+	private int accent(int index) {
+		return HudColors.isRainbow() ? HudColors.rainbow(index * 0.06f) : Theme.ACCENT;
 	}
 
 	private void drawRow(GuiGraphics context, Font font, int x, int y, String label, int background, int textColor) {

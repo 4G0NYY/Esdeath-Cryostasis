@@ -30,6 +30,9 @@ public final class DiscordPresenceModule extends Module {
 
 	public DiscordPresenceModule() {
 		super("DiscordRPC", "Shows what you are playing on Discord.", Category.MISC);
+		// On by default so presence just works out of the box; the worker only connects when
+		// Discord is actually running and clears itself when the module is turned off.
+		setEnabled(true);
 	}
 
 	@Override

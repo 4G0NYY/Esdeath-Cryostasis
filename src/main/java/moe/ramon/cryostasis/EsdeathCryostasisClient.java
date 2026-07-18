@@ -10,6 +10,7 @@ import moe.ramon.cryostasis.modules.hud.PlainsModule;
 import moe.ramon.cryostasis.modules.hud.RainbowModule;
 import moe.ramon.cryostasis.modules.hud.ReachDisplayModule;
 import moe.ramon.cryostasis.modules.hud.XyzModule;
+import moe.ramon.cryostasis.modules.combat.AutoDodgeModule;
 import moe.ramon.cryostasis.modules.combat.KillauraModule;
 import moe.ramon.cryostasis.modules.combat.MoreParticlesModule;
 import moe.ramon.cryostasis.modules.combat.SharpnessModule;
@@ -19,10 +20,14 @@ import moe.ramon.cryostasis.modules.misc.TabGuiModule;
 import moe.ramon.cryostasis.modules.misc.TakeAllModule;
 import moe.ramon.cryostasis.modules.movement.AutoPathModule;
 import moe.ramon.cryostasis.modules.movement.SafeWalkModule;
+import moe.ramon.cryostasis.modules.movement.SpiderModule;
+import moe.ramon.cryostasis.modules.movement.ZootModule;
 import moe.ramon.cryostasis.modules.player.AutoEquipModule;
 import moe.ramon.cryostasis.modules.player.AutoToolModule;
+import moe.ramon.cryostasis.modules.player.FastBreakModule;
 import moe.ramon.cryostasis.modules.player.ToggleSprintModule;
 import moe.ramon.cryostasis.modules.render.BlockOutlineModule;
+import moe.ramon.cryostasis.modules.render.CleanChatModule;
 import moe.ramon.cryostasis.modules.render.HitboxModule;
 import moe.ramon.cryostasis.modules.render.ZoomModule;
 import moe.ramon.cryostasis.cosmetics.render.CosmeticLayer;
@@ -110,17 +115,22 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new ToggleSprintModule());
 		modules.register(new SafeWalkModule());
 		modules.register(new AutoPathModule());
+		modules.register(new ZootModule());
+		modules.register(new SpiderModule());
 		// Render
 		modules.register(new HitboxModule());
 		modules.register(new BlockOutlineModule());
 		modules.register(new ZoomModule());
+		modules.register(new CleanChatModule());
 		// Combat
 		modules.register(new MoreParticlesModule());
 		modules.register(new SharpnessModule());
 		modules.register(new KillauraModule());
+		modules.register(new AutoDodgeModule());
 		// Player
 		modules.register(new AutoToolModule());
 		modules.register(new AutoEquipModule());
+		modules.register(new FastBreakModule());
 		// Misc
 		modules.register(new AutoTextModule());
 		modules.register(new TakeAllModule());

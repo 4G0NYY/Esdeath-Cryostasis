@@ -203,9 +203,19 @@ public final class DiscordIpc {
 		ByteBuffer header = readFully(8).order(ByteOrder.LITTLE_ENDIAN);
 		int op = header.getInt();
 		int length = header.getInt();
-		ByteBuffer body = readFully(length);
+		String payload = StandardCharsets.UTF_8.decode(readFully(length)).toString();
+		// Surface Discord's own reply. A bad client_id or a rejected activity comes back as a CLOSE
+		// frame or an ERROR event; swallowing it silently is what makes a broken presence look like
+		// nothing is happening at all, so log it. The READY and SET_ACTIVITY acks stay at debug.
 		if (op == OP_CLOSE) {
+			Cryostasis.LOGGER.warn("Discord RPC closed the connection: {}", payload);
 			throw new IOException("Discord closed the connection");
+		}
+		if (payload.contains("\"evt\":\"ERROR\"")) {
+			Cryostasis.LOGGER.warn("Discord RPC rejected a frame (check the application id and its "
+					+ "uploaded art assets): {}", payload);
+		} else {
+			Cryostasis.LOGGER.debug("Discord RPC frame: {}", payload);
 		}
 	}
 

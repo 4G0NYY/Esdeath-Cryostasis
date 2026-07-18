@@ -26,7 +26,9 @@ import java.util.List;
  * for a manual hit.
  */
 public final class KillauraModule extends Module {
-	private final NumberSetting range = register(new NumberSetting("Range", 4.0, 3.0, 6.0, 0.1));
+	// Max is well past vanilla melee reach so the user can crank it up; anything over ~4.5 only
+	// lands in singleplayer or on servers that do not check reach, but the choice is theirs.
+	private final NumberSetting range = register(new NumberSetting("Range", 4.0, 3.0, 8.0, 0.1));
 	private final ModeSetting targets = register(new ModeSetting("Targets", "All", List.of("Players", "Mobs", "All")));
 	private final BooleanSetting requireLineOfSight = register(new BooleanSetting("Line of Sight", true));
 	private final BooleanSetting rotate = register(new BooleanSetting("Rotate", false));
