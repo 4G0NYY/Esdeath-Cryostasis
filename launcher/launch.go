@@ -49,37 +49,12 @@ func openPath(path string) error {
 	return cmd.Start()
 }
 
-// openOfficialLauncher tries to start the Minecraft launcher so the user does not have to
-// find it themselves. It is deliberately best effort and reports whether it managed it: the
-// profile is already written by the time this runs, so the worst case is the user opening the
-// launcher by hand, which the UI tells them to do regardless.
-//
-// There is no reliable cross-platform way to start the launcher (Store app, standalone, and
-// distro packaging all differ), so this covers the common installs and gives up cleanly
-// rather than guessing at fragile paths.
-func openOfficialLauncher() bool {
-	switch runtime.GOOS {
-	case "windows":
-		candidates := []string{
-			filepath.Join(os.Getenv("ProgramFiles(x86)"), "Minecraft Launcher", "MinecraftLauncher.exe"),
-			filepath.Join(os.Getenv("ProgramFiles"), "Minecraft Launcher", "MinecraftLauncher.exe"),
-		}
-		for _, exe := range candidates {
-			if _, err := os.Stat(exe); err == nil {
-				if exec.Command(exe).Start() == nil {
-					return true
-				}
-			}
-		}
-		// The Store build has no stable exe path; launch it through its registered protocol.
-		return exec.Command("cmd", "/c", "start", "", "minecraft:").Start() == nil
-	case "darwin":
-		return exec.Command("open", "-a", "Minecraft").Start() == nil
-	default:
-		// No standard launcher binary name on Linux, so leave it to the user.
-		return false
-	}
-}
+// openOfficialLauncher tries to start the Minecraft launcher so the user does not have to find
+// it themselves. It is best effort and reports whether it managed it: the profile is already
+// written by the time this runs, so the worst case is the user opening the launcher by hand,
+// which the UI tells them to do regardless. The implementation is per-OS (see launch_*.go),
+// because starting the launcher — Store app, standalone, or distro package — differs enough
+// that there is no sensible shared version.
 
 // Account is a linked Microsoft account. It exists now because both seams below traffic in it;
 // nothing populates it yet.
