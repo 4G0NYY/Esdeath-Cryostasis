@@ -19,6 +19,7 @@ import moe.ramon.cryostasis.modules.misc.DiscordPresenceModule;
 import moe.ramon.cryostasis.modules.misc.TabGuiModule;
 import moe.ramon.cryostasis.modules.misc.TakeAllModule;
 import moe.ramon.cryostasis.modules.movement.AutoPathModule;
+import moe.ramon.cryostasis.modules.movement.JesusModule;
 import moe.ramon.cryostasis.modules.movement.NoCobwebModule;
 import moe.ramon.cryostasis.modules.movement.NoSoulsandModule;
 import moe.ramon.cryostasis.modules.movement.SafeWalkModule;
@@ -122,6 +123,7 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new AutoPathModule());
 		modules.register(new ZootModule());
 		modules.register(new SpiderModule());
+		modules.register(new JesusModule());
 		modules.register(new NoCobwebModule());
 		modules.register(new NoSoulsandModule());
 		// Render

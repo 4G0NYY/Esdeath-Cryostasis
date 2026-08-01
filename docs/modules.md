@@ -29,6 +29,13 @@ resize the window.
 | ToggleSprint | Sprints automatically while you move forward | none |
 | NoCobweb | Walk through cobwebs at full speed, ignoring their slowdown | none |
 | NoSoulsand | Cross soul sand at full speed, ignoring its slowdown | none |
+| Jesus | Walk on the surface of water instead of swimming in it | Lava on/off |
+
+Jesus works by giving the liquid a solid top, the same way vanilla lets a strider stand on
+lava, so you walk, sprint, and jump on water exactly as you would on land. Hold sneak to sink,
+and swimming and diving underneath are unchanged. Lava is a separate toggle and off by default.
+Like the two below it, it only moves the local player: singleplayer is consistent, but a
+fair-play multiplayer server still has you in the water and may pull you back.
 
 NoCobweb and NoSoulsand only touch the local player. In singleplayer they cover the
 integrated server too, so there is no rubber-banding; on a fair-play multiplayer server the

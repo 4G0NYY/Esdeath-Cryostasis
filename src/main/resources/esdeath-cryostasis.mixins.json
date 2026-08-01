@@ -14,6 +14,7 @@
 		"client.GuiGraphicsMixin",
 		"client.KeyboardMixin",
 		"client.LightTextureMixin",
+		"client.LiquidBlockMixin",
 		"client.LivingEntityMixin",
 		"client.MobEffectFogEnvironmentMixin",
 		"client.MouseMixin",
