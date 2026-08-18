@@ -1,0 +1,226 @@
+# GitLab CI/CD — translated from .github/workflows/build.yml, which is left in
+# place so the project still builds on GitHub.
+#
+# Builds the Fabric mod jar and the standalone installer on every version tag and
+# attaches both to a GitLab Release. The only Minecraft code that ever ships is
+# none: the mod jar carries no repackaged game, and the installer downloads Fabric
+# and the jar on the player's own machine, per the project ground rules.
+#
+# Tags only. Ordinary commits to main do not build: this is a personal client with a
+# tag-driven release flow, so a run per commit is spend with nothing to publish at the
+# end of it. A manual "Run pipeline" from the UI stays possible so the pipeline can be
+# exercised without inventing a throwaway tag.
+#
+# One difference from the GitHub original: there, `build` and `installer` each called
+# softprops/action-gh-release and had to be serialised so they did not race to create
+# the same release. GitLab creates a release from one job, so both build jobs simply
+# publish their files to the generic package registry and a single `release` job links
+# them — no serialisation needed, and the two builds run in parallel.
+
+stages:
+  - build
+  - image
+  - release
+
+variables:
+  PACKAGE_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/esdeath-cryostasis/${CI_COMMIT_TAG}"
+
+.tag_or_manual:
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+build:
+  extends: .tag_or_manual
+  stage: build
+  tags: [docker]
+  image: eclipse-temurin:21-jdk
+  script:
+    - chmod +x ./gradlew
+    - ./gradlew build --no-daemon
+    # Staged by an explicit name test rather than a glob. The obvious shorthand for "not
+    # the sources jar", build/libs/*[!sources].jar, is a character class that happens to
+    # work: it matches one trailing character outside {s,o,u,r,c,e}, so a version ending
+    # in any of those letters (0.3.0-pre) would silently exclude the mod jar itself and
+    # fail the release.
+    - |
+      set -eu
+      mkdir -p dist
+      find build/libs -maxdepth 1 -name '*.jar' ! -name '*-sources.jar' -exec cp {} dist/ \;
+      ls -1 dist
+    # On a tag, hand the jar to the package registry so the release can link it.
+    - |
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        for f in dist/*.jar; do
+          curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+            --upload-file "$f" "$PACKAGE_URL/$(basename "$f")"
+        done
+      fi
+  artifacts:
+    name: esdeath-cryostasis
+    # The runnable mod jar only, no sources jar.
+    paths:
+      - dist/*.jar
+    expire_in: 30 days
+
+# The setup installer is a separate artifact: a static Go binary that installs the desktop
+# launcher as a regular Windows app (into the user's programs folder, with shortcuts and an
+# Add/Remove Programs entry) and then the launcher installs the mod. It needs no Java, and no
+# Inno Setup or other toolchain — just `go build`. Windows only, because the Add/Remove
+# Programs install-and-uninstall model it implements has no meaning elsewhere; Linux and macOS
+# users run the launcher binary directly.
+#
+# It builds from the repository root, not installer/, because the download and release logic
+# lives in the shared internal/engine package (the launcher shares it), and the engine's tests
+# only run when `go test ./...` is invoked from the module root. Vet and test run on this Linux
+# runner and still cover the installer: its Windows-only logic sits behind build tags with a
+# compiled non-Windows stub, so the package builds and is vetted here before it is cross-built.
+installer:
+  extends: .tag_or_manual
+  stage: build
+  tags: [docker]
+  image: golang:1.23
+  script:
+    - go vet ./...
+    - go test ./...
+    # Windows amd64 only: the setup binary installs a Windows desktop app. Cross-built from
+    # this Linux runner (CGO_ENABLED=0, pure Go), so no Windows runner is needed just for this.
+    - |
+      set -eu
+      mkdir -p installer/dist
+      GOOS=windows GOARCH=amd64 CGO_ENABLED=0 \
+        go build -trimpath -ldflags '-s -w' -o installer/dist/EsdeathCryostasisSetup.exe ./installer
+      ls -1 installer/dist
+    - |
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        for f in installer/dist/*; do
+          curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+            --upload-file "$f" "$PACKAGE_URL/$(basename "$f")"
+        done
+      fi
+  artifacts:
+    name: esdeath-installer
+    paths:
+      - installer/dist/*
+    expire_in: 30 days
+
+# The desktop launcher is a Wails app: a native GUI binary per platform, so unlike the
+# cross-compiled installer it has to be built on each OS natively (each needs its own webview
+# and toolchain). It lives in its own Go module (launcher/) with the Wails dependency, kept
+# apart from the installer's dependency-free build.
+#
+# Parked: this instance has no Windows or macOS runners. The jobs are kept, tagged and
+# manual, so they neither block a pipeline nor get lost — register runners with the
+# `windows` / `macos` tags and they work as written. The Linux one is manual purely to
+# keep the three siblings symmetrical; it will run on the container runner as-is.
+.launcher:
+  extends: .tag_or_manual
+  stage: build
+  when: manual
+  allow_failure: true
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  script:
+    - cd launcher
+    # Pinned to the version the go.mod requires so the CLI and the runtime never drift apart.
+    - go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+    - export PATH="$(go env GOPATH)/bin:$PATH"
+    # wails build runs the frontend install and build first (per wails.json), then the Go
+    # build with the embedded dist, then packages the native binary into build/bin.
+    - wails build -platform $PLATFORM -tags webkit2_41 -clean -o esdeath-cryostasis-launcher
+  artifacts:
+    paths:
+      - launcher/build/bin/*
+
+launcher:linux:
+  extends: .launcher
+  tags: [docker]
+  image: golang:1.23
+  variables:
+    PLATFORM: linux/amd64
+  before_script:
+    # Linux is the only platform whose webview is not part of the OS: Wails renders through
+    # WebKitGTK, so its dev packages have to be installed before the build. -tags webkit2_41
+    # then switches Wails from its default 4.0 bindings to the 4.1 package installed here.
+    - apt-get update && apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev nodejs npm
+
+launcher:windows:
+  extends: .launcher
+  tags: [windows]
+  variables:
+    PLATFORM: windows/amd64
+
+launcher:macos:
+  extends: .launcher
+  tags: [macos]
+  variables:
+    PLATFORM: darwin/universal
+
+# The backend container is the third shippable, and the odd one out: it does not attach to
+# the release, it publishes to the container registry so a `docker compose pull` can redeploy
+# it. It is independent of the mod jar, so it runs alongside build/installer.
+#
+# NOTE: the image moved off ghcr.io with the GitLab migration; ~/cryostasis-deploy on
+# crimsonswarm01 now points at the path below.
+backend-image:
+  extends: .tag_or_manual
+  stage: image
+  tags: [docker]
+  image: docker:28-cli
+  services:
+    - docker:28-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  needs: []
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    # Gate the image on the suite the same way the mod ships behind `gradle build`: a broken
+    # backend must never reach `:latest`, because a redeploy pulls that tag blind. The suite
+    # needs no database - it runs against repo/memory.py.
+    - docker run --rm -v "$CI_PROJECT_DIR/backend:/src" -w /src python:3.12-slim sh -c "pip install -e '.[dev]' && pytest"
+    - export REF="$CI_REGISTRY_IMAGE/cryostasis-backend"
+    # On a v* tag: 1.2.3, 1.2, and latest. A manual run produces no tags and does not push
+    # (see the guard below), so it only validates that the image still builds.
+    - TAGS="--tag $REF:ci"
+    - |
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        VER="${CI_COMMIT_TAG#v}"
+        MINOR="$(echo "$VER" | cut -d. -f1,2)"
+        TAGS="--tag $REF:$VER --tag $REF:$MINOR --tag $REF:latest"
+      fi
+    - docker build $TAGS backend
+    - |
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        VER="${CI_COMMIT_TAG#v}"
+        MINOR="$(echo "$VER" | cut -d. -f1,2)"
+        docker push "$REF:$VER"; docker push "$REF:$MINOR"; docker push "$REF:latest"
+      else
+        echo "No tag — image built but not pushed (matches the GitHub dispatch behaviour)."
+      fi
+
+release:
+  stage: release
+  tags: [docker]
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+  needs:
+    - build
+    - installer
+  script:
+    - echo "Creating the GitLab release for $CI_COMMIT_TAG"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: $CI_COMMIT_TAG
+    description: "Esdeath Cryostasis $CI_COMMIT_TAG"
+    assets:
+      links:
+        - name: EsdeathCryostasisSetup.exe
+          url: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/esdeath-cryostasis/${CI_COMMIT_TAG}/EsdeathCryostasisSetup.exe
+          link_type: package
+        # The mod jar's filename carries the version, so it is linked through the
+        # package registry's directory listing rather than guessed here.
+        - name: Mod jar and all release files
+          url: ${CI_PROJECT_URL}/-/packages
+          link_type: other

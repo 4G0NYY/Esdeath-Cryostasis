@@ -13,7 +13,7 @@ version: "3.9"
 
 services:
   backend:
-    image: ghcr.io/4g0nyy/cryostasis-backend:latest
+    image: registry.ramon.moe/4g0nyy/esdeath-cryostasis/cryostasis-backend:latest
     environment:
       # Non-secret config. The database URL and JWT secret are Docker secrets (below), read from
       # /run/secrets by pydantic-settings, so no password sits in this file or in `docker inspect`.

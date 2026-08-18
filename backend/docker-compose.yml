@@ -14,7 +14,7 @@
 
 services:
   backend:
-    image: ghcr.io/4g0nyy/cryostasis-backend:latest
+    image: registry.ramon.moe/4g0nyy/esdeath-cryostasis/cryostasis-backend:latest
     # build: .            # local dev: build from ./ instead of pulling GHCR
     restart: unless-stopped
     depends_on:
