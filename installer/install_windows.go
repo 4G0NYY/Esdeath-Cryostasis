@@ -13,7 +13,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/4G0NYY/Esdeath-Cryostasis/internal/engine"
+	"gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis/internal/engine"
 )
 
 // The identity of the installed app. These names are the contract between install and

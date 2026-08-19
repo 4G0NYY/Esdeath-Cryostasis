@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/4G0NYY/Esdeath-Cryostasis/internal/engine"
+	"gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis/internal/engine"
 )
 
 //go:embed assets/esdeath-ascii.txt

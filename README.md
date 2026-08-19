@@ -32,7 +32,7 @@ marked as such in `Todo.md`. See it for the full roadmap and per-item progress.
 ### Windows: the setup installer (recommended)
 
 Download `EsdeathCryostasisSetup.exe` from the
-[latest release](https://github.com/4G0NYY/Esdeath-Cryostasis/releases/latest) and run it.
+[latest release](https://gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis/-/releases/permalink/latest) and run it.
 It installs the desktop launcher as a regular Windows app — into your programs folder, with a
 Start Menu (and Desktop) shortcut and an entry in **Add/Remove Programs** — with no
 administrator rights required. That single download is all you need; the launcher takes over

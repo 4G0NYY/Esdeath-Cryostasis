@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/4G0NYY/Esdeath-Cryostasis/internal/engine"
+	"gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis/internal/engine"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

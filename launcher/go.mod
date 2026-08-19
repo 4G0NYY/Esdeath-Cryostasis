@@ -1,12 +1,12 @@
 // Nested module for the desktop launcher. It is separate from the root module so the heavy
 // Wails dependency stays out of the installer's build. The replace points the shared engine
 // at the repository root, which is the parent of this directory.
-module github.com/4G0NYY/Esdeath-Cryostasis/launcher
+module gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis/launcher
 
 go 1.25.0
 
 require (
-	github.com/4G0NYY/Esdeath-Cryostasis v0.0.0
+	gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis v0.0.0
 	github.com/wailsapp/wails/v2 v2.13.0
 )
 
@@ -41,4 +41,4 @@ require (
 	golang.org/x/text v0.37.0 // indirect
 )
 
-replace github.com/4G0NYY/Esdeath-Cryostasis => ../
+replace gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis => ../

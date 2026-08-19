@@ -10,7 +10,7 @@ package engine
 const (
 	RepoOwner = "4G0NYY"
 	RepoName  = "Esdeath-Cryostasis"
-	RepoURL   = "https://github.com/4G0NYY/Esdeath-Cryostasis"
+	RepoURL   = "https://gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis"
 
 	ProfileKey  = "esdeath-cryostasis"
 	ProfileName = "Esdeath Cryostasis"
