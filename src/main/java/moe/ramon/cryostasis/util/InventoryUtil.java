@@ -5,6 +5,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
@@ -12,8 +13,8 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * Shared hotbar and item-ranking helpers for the automation modules (AutoTool, AutoEquip,
- * AutoPath). Kept in one place so the scoring stays identical across features and so the
- * server-sync detail of a slot change lives in exactly one spot.
+ * AutoTotem, AutoPath). Kept in one place so the scoring stays identical across features and
+ * so the server-sync detail of a slot change lives in exactly one spot.
  *
  * Item behavior classes (SwordItem, ArmorItem, DiggerItem) were folded into data
  * components in 1.21.2, so ranking reads the item's attribute modifiers and destroy speed
@@ -137,5 +138,18 @@ public final class InventoryUtil {
 			}
 		}
 		return armor * 10.0 + toughness;
+	}
+
+	/**
+	 * Map a raw {@link Inventory} index to its slot index in the player inventory menu, the
+	 * numbering {@code handleInventoryMouseClick} expects. The main inventory (9..35) lines up
+	 * one to one; the hotbar (0..8) sits at the end of the menu instead, after the armor and
+	 * crafting slots.
+	 */
+	public static int inventoryToMenuSlot(int inventoryIndex) {
+		if (inventoryIndex >= Inventory.SELECTION_SIZE) {
+			return inventoryIndex;
+		}
+		return InventoryMenu.USE_ROW_SLOT_START + inventoryIndex;
 	}
 }

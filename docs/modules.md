@@ -72,6 +72,21 @@ crit.
 | MoreParticles | Triples the crit particle burst; on a real crit only, unless Sharpness is on |
 | Sharpness | Shows a crit particle burst on every hit; defers to MoreParticles when that is on |
 
+## Player
+
+| Module | What it does | Settings |
+|---|---|---|
+| AutoTool | Swaps to the best tool for the block you are breaking, and to the best weapon when you hit something | Weapon On Attack |
+| AutoEquip | Wears the strongest armor you are carrying | none |
+| AutoTotem | Keeps a Totem of Undying in your offhand whenever you are carrying one | none |
+| FastBreak | Mines and breaks blocks faster | Multiplier |
+
+AutoEquip and AutoTotem move items through the inventory the same way your own clicks would,
+so the server sees an ordinary slot change. Both stay out of the way while a screen is open
+and do nothing in creative, and they wait a few ticks between swaps rather than clicking every
+tick. AutoTotem never throws anything away: whatever was in your offhand goes back into the
+slot the totem came from, so a shield ends up where the totem was.
+
 ## Misc
 
 | Module | What it does | Settings |

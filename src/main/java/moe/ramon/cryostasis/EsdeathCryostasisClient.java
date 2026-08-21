@@ -27,6 +27,7 @@ import moe.ramon.cryostasis.modules.movement.SpiderModule;
 import moe.ramon.cryostasis.modules.movement.ZootModule;
 import moe.ramon.cryostasis.modules.player.AutoEquipModule;
 import moe.ramon.cryostasis.modules.player.AutoToolModule;
+import moe.ramon.cryostasis.modules.player.AutoTotemModule;
 import moe.ramon.cryostasis.modules.player.FastBreakModule;
 import moe.ramon.cryostasis.modules.player.ToggleSprintModule;
 import moe.ramon.cryostasis.modules.render.BlockOutlineModule;
@@ -142,6 +143,7 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		// Player
 		modules.register(new AutoToolModule());
 		modules.register(new AutoEquipModule());
+		modules.register(new AutoTotemModule());
 		modules.register(new FastBreakModule());
 		// Misc
 		modules.register(new AutoTextModule());

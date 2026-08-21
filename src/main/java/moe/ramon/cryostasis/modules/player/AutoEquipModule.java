@@ -80,7 +80,7 @@ public final class AutoEquipModule extends Module {
 
 	private void equip(int inventoryIndex, int armorMenuSlot, boolean armorSlotEmpty) {
 		int containerId = mc.player.inventoryMenu.containerId;
-		int candidateMenuSlot = inventoryToMenuSlot(inventoryIndex);
+		int candidateMenuSlot = InventoryUtil.inventoryToMenuSlot(inventoryIndex);
 
 		if (armorSlotEmpty) {
 			// Shift-click routes an armor piece straight to its empty slot.
@@ -92,17 +92,5 @@ public final class AutoEquipModule extends Module {
 		mc.gameMode.handleInventoryMouseClick(containerId, candidateMenuSlot, 0, ClickType.PICKUP, mc.player);
 		mc.gameMode.handleInventoryMouseClick(containerId, armorMenuSlot, 0, ClickType.PICKUP, mc.player);
 		mc.gameMode.handleInventoryMouseClick(containerId, candidateMenuSlot, 0, ClickType.PICKUP, mc.player);
-	}
-
-	/**
-	 * Map a raw {@link net.minecraft.world.entity.player.Inventory} index to its slot index in
-	 * the player inventory menu. Main inventory (9..35) lines up one to one; the hotbar (0..8)
-	 * sits at menu slots 36..44.
-	 */
-	private int inventoryToMenuSlot(int inventoryIndex) {
-		if (inventoryIndex >= 9) {
-			return inventoryIndex;
-		}
-		return 36 + inventoryIndex;
 	}
 }
