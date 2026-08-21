@@ -31,13 +31,13 @@ func standaloneLauncherPaths() []string {
 	}
 }
 
-// openOfficialLauncher starts the modern Minecraft launcher — the one that reads the
+// openOfficialLauncher starts the modern Minecraft launcher, the one that reads the
 // launcher_profiles.json this installer wrote. It tries, in order: the standalone .exe at its
 // known install paths, then the Microsoft Store build activated by its app id.
 //
 // It deliberately never fires a bare "minecraft:" as a last resort. On a machine where nothing
 // has registered that protocol (which is the norm for the Store build), doing so pops the
-// Windows "there's no app on your PC to open this minecraft link" dialog — exactly the failure
+// Windows "there's no app on your PC to open this minecraft link" dialog, exactly the failure
 // this replaces. Returning false instead lets the UI tell the user to open the launcher by
 // hand, which is the honest outcome when we genuinely could not find it.
 func openOfficialLauncher() bool {

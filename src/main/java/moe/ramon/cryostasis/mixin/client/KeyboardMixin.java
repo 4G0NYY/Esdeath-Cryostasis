@@ -9,20 +9,23 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Forwards raw key presses to the input handler so module hotkeys and the click GUI key
- * work everywhere the game reads the keyboard. Only rising edges (GLFW_PRESS) are
- * forwarded; repeats and releases are ignored so a held key toggles once.
+ * Forwards raw key edges to the input handler so module hotkeys and the click GUI key work
+ * everywhere the game reads the keyboard. Repeats are dropped, so a held key toggles once;
+ * releases are forwarded because a hold-to-activate module needs to know when the key goes back
+ * up, wherever the player happens to be when it does.
  */
 @Mixin(KeyboardHandler.class)
 public class KeyboardMixin {
 	@Inject(method = "keyPress", at = @At("HEAD"))
 	private void cryostasis$onKey(long window, int key, int scancode, int action, int modifiers, CallbackInfo ci) {
-		if (action != GLFW.GLFW_PRESS) {
+		Cryostasis cryostasis = Cryostasis.get();
+		if (cryostasis == null) {
 			return;
 		}
-		Cryostasis cryostasis = Cryostasis.get();
-		if (cryostasis != null) {
+		if (action == GLFW.GLFW_PRESS) {
 			cryostasis.getInputHandler().onKeyPress(key);
+		} else if (action == GLFW.GLFW_RELEASE) {
+			cryostasis.getInputHandler().onKeyRelease(key);
 		}
 	}
 }

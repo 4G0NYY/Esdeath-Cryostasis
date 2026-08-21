@@ -51,6 +51,8 @@ server still applies the slowdown, so use them with that in mind.
 | Xray | Reveals selected ores and blocks through terrain, hiding everything else | Per-material toggles (Coal, Iron, Copper, Gold, Redstone, Lapis, Diamond, Emerald, Quartz, Netherite, Amethyst), Containers, Spawners, Vaults, Suspicious, and an Extra field for custom block ids |
 | NoBlind | Ignores the blindness effect, keeping vision clear | none |
 | Nightvision | Keeps the world bright like the night vision potion and ignores darkness | none |
+| Freecam | Detaches the camera and flies it through anything, leaving your body behind | Speed, Range |
+| Freelook | Hold a key to look around without turning your body | Key, View |
 
 Xray ships with a sensible default selection (the valuable ores plus containers, spawners,
 and vaults; coal and suspicious blocks are off to cut clutter). Toggle materials in the click
@@ -60,6 +62,30 @@ rebuilds the visible chunks so the change shows at once.
 
 Nightvision also themes the sky: while Rainbow mode is on, the horizon sweeps through the
 same rainbow the HUD uses, so the world matches the client theme.
+
+Freecam is an out-of-body camera. Turn it on and the view lifts out of your player: the
+movement keys fly it, the mouse turns it, and it passes straight through blocks. Hold the
+sprint key to move at double speed. Your body stays exactly where it was standing, facing
+where it was facing, because the movement input is emptied and the mouse is routed to the
+camera instead of to you, so nothing about this goes to the server. The view switches to
+third person for the duration, which is what lets you see yourself from the outside; your
+previous view comes back when you turn it off, as does the camera.
+
+Range is a tether, not a preference. The client only has chunks loaded around your body, so
+a camera that outran them would be looking into empty space; the tether pulls it back to
+within that many blocks. Note that the crosshair stays where your body left it, so mining
+and attacking still only reach what you could actually reach.
+
+Freelook is the light version, for a glance over your shoulder while you run. Hold the key
+(Left Alt by default, rebindable under the module) and the mouse aims the camera only: you
+keep facing, and keep running, exactly where you were. Let go and the view snaps back, since
+your body never turned in the first place. It goes to third person while held, and the View
+setting picks which one: Third, Front, or First if you would rather keep the first-person
+camera and just free the direction.
+
+A press is ignored while a menu is open, so the key is safe to hold while typing, and a
+release always counts, so nothing can leave your view stuck outside your body. If Freecam has
+the camera out, it keeps it and Freelook stays out of its way.
 
 ## Combat feedback
 
@@ -80,6 +106,13 @@ crit.
 | AutoEquip | Wears the strongest armor you are carrying | none |
 | AutoTotem | Keeps a Totem of Undying in your offhand whenever you are carrying one | none |
 | FastBreak | Mines and breaks blocks faster | Multiplier |
+| NoHunger | Keeps the hunger bar from draining | none |
+
+NoHunger drops the exhaustion that food and saturation are spent on, so the bar holds where
+it is. It never adds anything back: a bar already empty stays empty until you eat. Hunger is
+owned by whichever side runs the food data, and that is never the client, so like NoCobweb
+and NoSoulsand it holds in singleplayer (where it covers the integrated server too) and
+changes nothing on a fair-play multiplayer server.
 
 AutoEquip and AutoTotem move items through the inventory the same way your own clicks would,
 so the server sees an ordinary slot change. Both stay out of the way while a screen is open
@@ -92,9 +125,16 @@ slot the totem came from, so a shield ends up where the totem was.
 | Module | What it does | Settings |
 |---|---|---|
 | AutoText | Sends a preset message or command when its bound key is pressed | Key, Message |
+| TabGui | An arrow-key menu in the corner with the same toggles as the click GUI | none |
 
 For AutoText, bind a key and set the message in the click GUI. A message starting with `/`
 is sent as a command.
+
+TabGui sits in the bottom-left corner and needs no screen: up and down move through the
+categories, right (or enter) steps into one and toggles a module, and left steps back out.
+The module column opens to the right of the category column, so the menu grows the way the
+keys read. It only consumes the arrow keys while it is enabled; every other key still
+reaches your module hotkeys.
 
 ## Cosmetics
 

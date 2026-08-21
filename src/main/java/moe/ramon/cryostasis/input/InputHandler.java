@@ -5,6 +5,7 @@ import moe.ramon.cryostasis.gui.CosmeticsScreen;
 import moe.ramon.cryostasis.module.Module;
 import moe.ramon.cryostasis.module.ModuleManager;
 import moe.ramon.cryostasis.modules.misc.TabGuiModule;
+import moe.ramon.cryostasis.modules.render.FreelookModule;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
@@ -18,6 +19,10 @@ import java.util.List;
  * Presses are ignored while any screen is open so that typing in chat or the GUI never
  * toggles a module. The GUI open key is deliberately checked from within the GUI too,
  * which is handled by the screen itself (Escape closes it).
+ *
+ * Releases are routed separately and are never gated on the screen, because they end something
+ * that is already running: a hold-to-activate module has to be let go of even if a menu opened
+ * over it while the key was down.
  */
 public final class InputHandler {
 	private final ModuleManager modules;
@@ -45,6 +50,12 @@ public final class InputHandler {
 			mc.setScreen(new CosmeticsScreen());
 			return;
 		}
+		// Hold-to-look starts before anything can consume the key, since it is held rather than
+		// toggled and does not care whether the key also drives something else.
+		FreelookModule freelook = modules.get(FreelookModule.class);
+		if (freelook != null && freelook.isEnabled()) {
+			freelook.onKeyDown(key);
+		}
 		// The arrow-key menu, when enabled, consumes navigation keys before they can match a
 		// module hotkey. Any other key falls through so normal hotkeys still work.
 		TabGuiModule tabGui = modules.get(TabGuiModule.class);
@@ -57,6 +68,16 @@ public final class InputHandler {
 			if (module.getKeyCode() == key) {
 				module.toggle();
 			}
+		}
+	}
+
+	public void onKeyRelease(int key) {
+		if (key == GLFW.GLFW_KEY_UNKNOWN) {
+			return;
+		}
+		FreelookModule freelook = modules.get(FreelookModule.class);
+		if (freelook != null) {
+			freelook.onKeyUp(key);
 		}
 	}
 

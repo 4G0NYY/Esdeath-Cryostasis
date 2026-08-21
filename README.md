@@ -35,15 +35,15 @@ marked as such in `Todo.md`. See it for the full roadmap and per-item progress.
 
 Download `EsdeathCryostasisSetup.exe` from the
 [latest release](https://gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis/-/releases/permalink/latest) and run it.
-It installs the desktop launcher as a regular Windows app — into your programs folder, with a
-Start Menu (and Desktop) shortcut and an entry in **Add/Remove Programs** — with no
+It installs the desktop launcher as a regular Windows app: into your programs folder, with a
+Start Menu (and Desktop) shortcut and an entry in **Add/Remove Programs**, and with no
 administrator rights required. That single download is all you need; the launcher takes over
 from there and installs and updates the mod itself.
 
 Open the launcher, and it installs Fabric, Fabric API, and the newest mod jar into your
 `.minecraft`, writes the "Esdeath Cryostasis" launch profile, and hands off to the official
 Minecraft launcher to play. It also adds one thing nothing else does: a Settings field to point
-the client at any backend, defaulting to the hosted `cryostasis.ramon.moe/api` — self-hosting
+the client at any backend, defaulting to the hosted `cryostasis.ramon.moe/api`. Self-hosting
 the open-source backend? Enter your instance there and it pins that into the profile. See
 [`launcher/README.md`](launcher/README.md).
 
@@ -58,8 +58,8 @@ Useful flags:
 - `--no-desktop-shortcut` skip the Desktop shortcut.
 - `--no-launch` do not start the launcher after installing.
 
-On Linux and macOS there is no setup installer — the "install as a desktop app" model is
-Windows-specific. Download the launcher binary for your platform from the release and run it
+On Linux and macOS there is no setup installer, because the "install as a desktop app" model
+is Windows-specific. Download the launcher binary for your platform from the release and run it
 directly; it does the same mod install and backend setup.
 
 ### By hand

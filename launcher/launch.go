@@ -53,7 +53,7 @@ func openPath(path string) error {
 // it themselves. It is best effort and reports whether it managed it: the profile is already
 // written by the time this runs, so the worst case is the user opening the launcher by hand,
 // which the UI tells them to do regardless. The implementation is per-OS (see launch_*.go),
-// because starting the launcher — Store app, standalone, or distro package — differs enough
+// because starting the launcher (Store app, standalone, or distro package) differs enough
 // that there is no sensible shared version.
 
 // Account is a linked Microsoft account. It exists now because both seams below traffic in it;

@@ -1,5 +1,6 @@
 package moe.ramon.cryostasis.gui;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import moe.ramon.cryostasis.Cryostasis;
 import moe.ramon.cryostasis.module.Category;
 import moe.ramon.cryostasis.module.Module;
@@ -9,6 +10,7 @@ import moe.ramon.cryostasis.setting.KeybindSetting;
 import moe.ramon.cryostasis.setting.ModeSetting;
 import moe.ramon.cryostasis.setting.NumberSetting;
 import moe.ramon.cryostasis.setting.Setting;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -43,7 +45,11 @@ public final class ClickGuiScreen extends Screen {
 			0xFFFF5555, 0xFF55FF55, 0xFF5555FF, 0xFFFFFF55, 0xFFFF55FF, 0xFF55FFFF, 0xFFFFFFFF
 	};
 
-	// Persist panel positions and expansion across reopenings within a session.
+	// Persist panel positions and expansion across reopenings within a session. The panels
+	// outlive the screen that built them, so they hold layout state only and take the screen
+	// that is currently showing them as a parameter. An inner class would instead capture the
+	// first screen forever, and every menu opened after that one would write its bind state
+	// into a screen that is no longer on display.
 	private static final List<Panel> PANELS = new ArrayList<>();
 	private static boolean initialized;
 
@@ -78,9 +84,9 @@ public final class ClickGuiScreen extends Screen {
 		// throws "Can only blur once per frame".
 		context.fill(0, 0, width, height, Theme.DIM);
 		for (Panel panel : PANELS) {
-			panel.render(context, mouseX, mouseY);
+			panel.render(this, context, mouseX, mouseY);
 		}
-		if (bindingCapture != null || bindingModule != null) {
+		if (bindingModule != null || bindingCapture != null) {
 			context.drawCenteredString(font,
 					"Press a key to bind, Escape to clear", width / 2, height - 14, COLOR_TEXT);
 		}
@@ -88,6 +94,10 @@ public final class ClickGuiScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		// A pending capture belongs to the row that started it, so any other click cancels it.
+		// Without this the next key press lands on a bind the user has already moved away from.
+		bindingModule = null;
+		bindingCapture = null;
 		for (Panel panel : PANELS) {
 			// Header: left drag to move, right click to collapse the whole panel.
 			if (panel.inHeader(mouseX, mouseY)) {
@@ -103,7 +113,7 @@ public final class ClickGuiScreen extends Screen {
 			if (panel.collapsed) {
 				continue;
 			}
-			if (panel.handleClick(mouseX, mouseY, button)) {
+			if (panel.handleClick(this, mouseX, mouseY, button)) {
 				return true;
 			}
 		}
@@ -159,8 +169,66 @@ public final class ClickGuiScreen extends Screen {
 		super.onClose();
 	}
 
+	private void clickSetting(Setting<?> setting, int button) {
+		if (setting instanceof BooleanSetting bool) {
+			bool.toggle();
+		} else if (setting instanceof ModeSetting mode) {
+			mode.cycle();
+		} else if (setting instanceof KeybindSetting keybind) {
+			bindingCapture = keybind;
+		} else if (setting instanceof ColorSetting color) {
+			cyclePalette(color);
+		}
+	}
+
+	private static void cyclePalette(ColorSetting color) {
+		int current = color.get();
+		int index = 0;
+		for (int i = 0; i < COLOR_PALETTE.length; i++) {
+			if (COLOR_PALETTE[i] == current) {
+				index = i + 1;
+				break;
+			}
+		}
+		color.set(COLOR_PALETTE[index % COLOR_PALETTE.length]);
+	}
+
+	private static String describe(Setting<?> setting) {
+		if (setting instanceof BooleanSetting bool) {
+			return setting.getName() + ": " + (bool.get() ? "on" : "off");
+		} else if (setting instanceof ModeSetting mode) {
+			return setting.getName() + ": " + mode.get();
+		} else if (setting instanceof NumberSetting number) {
+			return setting.getName() + ": " + trim(number.get());
+		} else if (setting instanceof KeybindSetting keybind) {
+			return setting.getName() + ": " + keyName(keybind.get());
+		} else if (setting instanceof ColorSetting) {
+			return setting.getName();
+		}
+		return setting.getName();
+	}
+
+	private static String trim(double value) {
+		if (value == Math.rint(value)) {
+			return Integer.toString((int) value);
+		}
+		return String.format("%.2f", value);
+	}
+
+	/**
+	 * The label for a bound key. Goes through the game's own key names rather than
+	 * {@code glfwGetKeyName}, which answers null for every key that prints no character, so
+	 * F-keys, arrows, and the modifiers read as themselves instead of as a raw code.
+	 */
+	private static String keyName(int key) {
+		if (key == GLFW.GLFW_KEY_UNKNOWN) {
+			return "none";
+		}
+		return InputConstants.Type.KEYSYM.getOrCreate(key).getDisplayName().getString().toUpperCase();
+	}
+
 	/** A single category column. */
-	private final class Panel {
+	private static final class Panel {
 		private final Category category;
 		private int x;
 		private int y;
@@ -181,7 +249,8 @@ public final class ClickGuiScreen extends Screen {
 			return mx >= x && mx <= x + PANEL_WIDTH && my >= y && my <= y + HEADER_HEIGHT;
 		}
 
-		void render(GuiGraphics context, int mouseX, int mouseY) {
+		void render(ClickGuiScreen screen, GuiGraphics context, int mouseX, int mouseY) {
+			Font font = screen.font;
 			context.fill(x, y, x + PANEL_WIDTH, y + HEADER_HEIGHT, COLOR_HEADER);
 			// Accent underline on the header, echoing the title screen's panel seam.
 			context.fill(x, y + HEADER_HEIGHT - 1, x + PANEL_WIDTH, y + HEADER_HEIGHT, Theme.ACCENT);
@@ -209,20 +278,21 @@ public final class ClickGuiScreen extends Screen {
 				if (expanded.contains(module)) {
 					// Toggle-key bind row, first under the module so it is easy to find.
 					context.fill(x, rowY, x + PANEL_WIDTH, rowY + ROW_HEIGHT, Theme.SETTING_ROW);
-					int bindColor = bindingModule == module ? Theme.ACCENT : COLOR_SUBTEXT;
+					int bindColor = screen.bindingModule == module ? Theme.ACCENT : COLOR_SUBTEXT;
 					context.drawString(font, "Bind: " + keyName(module.getKeyCode()), x + 8, rowY + 3, bindColor);
 					rowY += ROW_HEIGHT;
 
 					for (Setting<?> setting : module.getSettings()) {
 						context.fill(x, rowY, x + PANEL_WIDTH, rowY + ROW_HEIGHT, Theme.SETTING_ROW);
-						context.drawString(font, describe(setting), x + 8, rowY + 3, COLOR_SUBTEXT);
+						int settingColor = screen.bindingCapture == setting ? Theme.ACCENT : COLOR_SUBTEXT;
+						context.drawString(font, describe(setting), x + 8, rowY + 3, settingColor);
 						rowY += ROW_HEIGHT;
 					}
 				}
 			}
 		}
 
-		boolean handleClick(double mx, double my, int button) {
+		boolean handleClick(ClickGuiScreen screen, double mx, double my, int button) {
 			if (mx < x || mx > x + PANEL_WIDTH) {
 				return false;
 			}
@@ -244,15 +314,14 @@ public final class ClickGuiScreen extends Screen {
 				if (expanded.contains(module)) {
 					// Bind row: clicking it starts key capture for this module's toggle.
 					if (my >= rowY && my <= rowY + ROW_HEIGHT) {
-						bindingModule = module;
-						bindingCapture = null;
+						screen.bindingModule = module;
 						return true;
 					}
 					rowY += ROW_HEIGHT;
 
 					for (Setting<?> setting : module.getSettings()) {
 						if (my >= rowY && my <= rowY + ROW_HEIGHT) {
-							clickSetting(setting, button);
+							screen.clickSetting(setting, button);
 							return true;
 						}
 						rowY += ROW_HEIGHT;
@@ -282,60 +351,6 @@ public final class ClickGuiScreen extends Screen {
 				}
 			}
 			return false;
-		}
-
-		private void clickSetting(Setting<?> setting, int button) {
-			if (setting instanceof BooleanSetting bool) {
-				bool.toggle();
-			} else if (setting instanceof ModeSetting mode) {
-				mode.cycle();
-			} else if (setting instanceof KeybindSetting keybind) {
-				bindingCapture = keybind;
-			} else if (setting instanceof ColorSetting color) {
-				cyclePalette(color);
-			}
-		}
-
-		private void cyclePalette(ColorSetting color) {
-			int current = color.get();
-			int index = 0;
-			for (int i = 0; i < COLOR_PALETTE.length; i++) {
-				if (COLOR_PALETTE[i] == current) {
-					index = i + 1;
-					break;
-				}
-			}
-			color.set(COLOR_PALETTE[index % COLOR_PALETTE.length]);
-		}
-
-		private String describe(Setting<?> setting) {
-			if (setting instanceof BooleanSetting bool) {
-				return setting.getName() + ": " + (bool.get() ? "on" : "off");
-			} else if (setting instanceof ModeSetting mode) {
-				return setting.getName() + ": " + mode.get();
-			} else if (setting instanceof NumberSetting number) {
-				return setting.getName() + ": " + trim(number.get());
-			} else if (setting instanceof KeybindSetting keybind) {
-				return setting.getName() + ": " + keyName(keybind.get());
-			} else if (setting instanceof ColorSetting) {
-				return setting.getName();
-			}
-			return setting.getName();
-		}
-
-		private String trim(double value) {
-			if (value == Math.rint(value)) {
-				return Integer.toString((int) value);
-			}
-			return String.format("%.2f", value);
-		}
-
-		private String keyName(int key) {
-			if (key == GLFW.GLFW_KEY_UNKNOWN) {
-				return "none";
-			}
-			String name = GLFW.glfwGetKeyName(key, 0);
-			return name != null ? name.toUpperCase() : "key " + key;
 		}
 	}
 }

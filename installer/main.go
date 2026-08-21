@@ -1,6 +1,6 @@
 // Command esdeath-installer is the setup program for Esdeath: Cryostasis. It installs the
-// desktop launcher as a regular Windows application — into the user's programs folder, with
-// Start Menu and Desktop shortcuts and an Add/Remove Programs entry — and the launcher then
+// desktop launcher as a regular Windows application: into the user's programs folder, with
+// Start Menu and Desktop shortcuts and an Add/Remove Programs entry. The launcher then
 // installs and updates the mod itself. It is the single thing a player needs to download.
 //
 // The install is idempotent: re-running it fetches the newest launcher and refreshes the

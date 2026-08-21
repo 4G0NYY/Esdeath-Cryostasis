@@ -66,7 +66,7 @@ jobs:
   # The setup installer is a separate artifact: a static Go binary that installs the desktop
   # launcher as a regular Windows app (into the user's programs folder, with shortcuts and an
   # Add/Remove Programs entry) and then the launcher installs the mod. It needs no Java, and no
-  # Inno Setup or other toolchain — just `go build`. Windows only, because the Add/Remove
+  # Inno Setup or other toolchain, just `go build`. Windows only, because the Add/Remove
   # Programs install-and-uninstall model it implements has no meaning elsewhere; Linux and macOS
   # users run the launcher binary directly.
   #

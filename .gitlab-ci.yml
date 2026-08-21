@@ -1,4 +1,4 @@
-# GitLab CI/CD — translated from .github/workflows/build.yml, which is left in
+# GitLab CI/CD, translated from .github/workflows/build.yml, which is left in
 # place so the project still builds on GitHub.
 #
 # Builds the Fabric mod jar and the standalone installer on every version tag and
@@ -20,7 +20,7 @@
 # softprops/action-gh-release and had to be serialised so they did not race to create
 # the same release. GitLab creates a release from one job, so both build jobs simply
 # publish their files to the generic package registry and a single `release` job links
-# them — no serialisation needed, and the two builds run in parallel.
+# them, so no serialisation is needed and the two builds run in parallel.
 
 stages:
   - build
@@ -82,7 +82,7 @@ build:
 # The setup installer is a separate artifact: a static Go binary that installs the desktop
 # launcher as a regular Windows app (into the user's programs folder, with shortcuts and an
 # Add/Remove Programs entry) and then the launcher installs the mod. It needs no Java, and no
-# Inno Setup or other toolchain — just `go build`. Windows only, because the Add/Remove
+# Inno Setup or other toolchain, just `go build`. Windows only, because the Add/Remove
 # Programs install-and-uninstall model it implements has no meaning elsewhere; Linux and macOS
 # users run the launcher binary directly.
 #
@@ -127,7 +127,7 @@ installer:
 #
 # This template covers the two platforms that are not part of a release. macOS is still parked
 # for want of a runner: it is kept, tagged and manual, so it neither blocks a pipeline nor gets
-# lost — register a runner with the `macos` tag and it works as written. The Linux one is manual
+# lost: register a runner with the `macos` tag and it works as written. The Linux one is manual
 # purely to keep the siblings symmetrical; it will run on the container runner as-is.
 #
 # Windows is not built from this template. It runs on a shell runner rather than a container,
@@ -202,7 +202,7 @@ launcher:windows:
     - |
       # $ErrorActionPreference is deliberately left at its default. Set to Stop, Windows
       # PowerShell turns anything a native command writes to stderr into a terminating error,
-      # and go, npm and wails all report progress there — the build would fail on its own
+      # and go, npm and wails all report progress there, so the build would fail on its own
       # console output. Every fallible step below is checked explicitly instead.
       #
       # The progress bar costs more than the download itself in a non-interactive shell, and
@@ -346,7 +346,7 @@ backend-image:
         MINOR="$(echo "$VER" | cut -d. -f1,2)"
         docker push "$REF:$VER"; docker push "$REF:$MINOR"; docker push "$REF:latest"
       else
-        echo "No tag — image built but not pushed (matches the GitHub dispatch behaviour)."
+        echo "No tag, so the image was built but not pushed (matches the GitHub dispatch behaviour)."
       fi
 
 release:

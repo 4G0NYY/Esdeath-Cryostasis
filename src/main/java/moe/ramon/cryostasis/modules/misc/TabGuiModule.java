@@ -94,17 +94,16 @@ public final class TabGuiModule extends Module {
 		Category[] categories = Category.values();
 		List<Module> modules = inModules ? currentModules() : null;
 
-		// Anchor to the bottom-right corner so the menu never covers the top-left HUD stack (FPS,
-		// CPS, coordinates). The category column is the rightmost; the module column, when open,
-		// grows to its left, so both stay on screen. Both columns share a top edge chosen so the
-		// taller of the two just reaches the bottom margin, which lets the block grow upward
-		// instead of spilling off the bottom.
-		int screenWidth = mc.getWindow().getGuiScaledWidth();
+		// Anchor to the bottom-left corner, below the top-left HUD stack (FPS, CPS, coordinates).
+		// The category column is the leftmost and the module column opens to its right, so the
+		// menu grows the same way the keys read: right steps into a category, left steps back
+		// out. Both columns share a top edge chosen so the taller of the two just reaches the
+		// bottom margin, which lets the block grow upward instead of spilling off the bottom.
 		int screenHeight = mc.getWindow().getGuiScaledHeight();
 		int moduleRows = modules != null ? modules.size() : 0;
 		int maxRows = Math.max(categories.length, moduleRows);
 		int topY = screenHeight - MARGIN - maxRows * ROW_HEIGHT;
-		int categoryX = screenWidth - MARGIN - COLUMN_WIDTH;
+		int categoryX = MARGIN;
 
 		int y = topY;
 		for (int i = 0; i < categories.length; i++) {
@@ -116,7 +115,7 @@ public final class TabGuiModule extends Module {
 		}
 
 		if (modules != null) {
-			int moduleX = categoryX - 2 - COLUMN_WIDTH;
+			int moduleX = categoryX + COLUMN_WIDTH + 2;
 			int moduleY = topY;
 			for (int i = 0; i < modules.size(); i++) {
 				Module module = modules.get(i);

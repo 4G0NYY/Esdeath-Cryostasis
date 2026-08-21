@@ -29,9 +29,12 @@ import moe.ramon.cryostasis.modules.player.AutoEquipModule;
 import moe.ramon.cryostasis.modules.player.AutoToolModule;
 import moe.ramon.cryostasis.modules.player.AutoTotemModule;
 import moe.ramon.cryostasis.modules.player.FastBreakModule;
+import moe.ramon.cryostasis.modules.player.NoHungerModule;
 import moe.ramon.cryostasis.modules.player.ToggleSprintModule;
 import moe.ramon.cryostasis.modules.render.BlockOutlineModule;
 import moe.ramon.cryostasis.modules.render.CleanChatModule;
+import moe.ramon.cryostasis.modules.render.FreecamModule;
+import moe.ramon.cryostasis.modules.render.FreelookModule;
 import moe.ramon.cryostasis.modules.render.HitboxModule;
 import moe.ramon.cryostasis.modules.render.NightvisionModule;
 import moe.ramon.cryostasis.modules.render.NoBlindModule;
@@ -135,6 +138,8 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new XrayModule());
 		modules.register(new NoBlindModule());
 		modules.register(new NightvisionModule());
+		modules.register(new FreecamModule());
+		modules.register(new FreelookModule());
 		// Combat
 		modules.register(new MoreParticlesModule());
 		modules.register(new SharpnessModule());
@@ -145,6 +150,7 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new AutoEquipModule());
 		modules.register(new AutoTotemModule());
 		modules.register(new FastBreakModule());
+		modules.register(new NoHungerModule());
 		// Misc
 		modules.register(new AutoTextModule());
 		modules.register(new TakeAllModule());

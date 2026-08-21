@@ -4,6 +4,8 @@ import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import moe.ramon.cryostasis.Cryostasis;
 import moe.ramon.cryostasis.modules.movement.NoCobwebModule;
 import moe.ramon.cryostasis.modules.movement.NoSoulsandModule;
+import moe.ramon.cryostasis.modules.render.FreecamModule;
+import moe.ramon.cryostasis.modules.render.FreelookModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -17,11 +19,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Local-player physics hooks that hang off {@link Entity}. The Mixin applies to every entity,
- * so each hook guards itself to the client's own player first. The guard is by UUID rather than
- * instance identity so that in singleplayer it catches both the client LocalPlayer (the movement
- * the player feels) and the integrated server's ServerPlayer (the authority that would otherwise
- * re-apply the slowdown and rubber-band the player back), matching the FastBreak approach.
+ * Local-player hooks that hang off {@link Entity}. The Mixin applies to every entity, so each
+ * hook guards itself to the client's own player first. The physics hooks guard by UUID rather
+ * than instance identity so that in singleplayer they catch both the client LocalPlayer (the
+ * movement the player feels) and the integrated server's ServerPlayer (the authority that would
+ * otherwise re-apply the slowdown and rubber-band the player back), matching the FastBreak
+ * approach.
  */
 @Mixin(Entity.class)
 public abstract class EntityMixin {
@@ -79,6 +82,35 @@ public abstract class EntityMixin {
 			return 1.0f;
 		}
 		return original;
+	}
+
+	/**
+	 * Freecam and Freelook: steer the free camera with the mouse instead of the body, leaving the
+	 * head pointing where it was left. Identity against the client's player rather than the UUID
+	 * guard the physics hooks use, because the mouse only ever turns that one entity, and a
+	 * rotation the server made should still land. Freecam is asked first: it has the camera off
+	 * the body entirely, so a glance underneath it would have nothing to aim.
+	 */
+	@Inject(method = "turn", at = @At("HEAD"), cancellable = true)
+	private void cryostasis$freeView(double yRot, double xRot, CallbackInfo ci) {
+		if ((Object) this != Minecraft.getInstance().player) {
+			return;
+		}
+		Cryostasis cryostasis = Cryostasis.get();
+		if (cryostasis == null) {
+			return;
+		}
+		FreecamModule freecam = cryostasis.getModuleManager().get(FreecamModule.class);
+		if (freecam != null && freecam.isDetached()) {
+			freecam.turn(yRot, xRot);
+			ci.cancel();
+			return;
+		}
+		FreelookModule freelook = cryostasis.getModuleManager().get(FreelookModule.class);
+		if (freelook != null && freelook.isLooking()) {
+			freelook.turn(yRot, xRot);
+			ci.cancel();
+		}
 	}
 
 	private boolean cryostasis$isLocalPlayer() {
