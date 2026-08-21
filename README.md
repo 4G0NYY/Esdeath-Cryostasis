@@ -1,5 +1,7 @@
 # Esdeath: Cryostasis
 
+![Showcase](/assets/Showcase.png)
+
 A modern rebuild of the abandoned EsdeathClient (Minecraft 1.8.9) as a Fabric mod for
 Minecraft 1.21.x. Quality-of-life HUD modules and cosmetics, client side only. This is not
 a cheat: it ships nothing a fair-play server would flag.
