@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -255,6 +256,60 @@ func TestLauncherAsset(t *testing.T) {
 	}}
 	if _, err := LauncherAsset(bare, "windows"); err == nil {
 		t.Error("want an error when the release has no launcher asset, got nil")
+	}
+}
+
+// The releases API is the one thing the engine cannot try against a real server here, and
+// GitLab's shape is not GitHub's: files hang off assets.links rather than a flat asset list,
+// and the source archives it adds on its own must not be mistaken for release files. Getting
+// this wrong means the launcher quietly finds no mod jar, so pin the decode.
+func TestGitlabReleaseDecode(t *testing.T) {
+	const body = `{
+	  "tag_name": "v0.6.1",
+	  "assets": {
+	    "count": 4,
+	    "sources": [
+	      {"format": "zip", "url": "https://gitlab.ramon.moe/x/archive/v0.6.1/x-v0.6.1.zip"}
+	    ],
+	    "links": [
+	      {"id": 1, "name": "EsdeathCryostasisSetup.exe", "url": "https://gitlab.ramon.moe/pkg/EsdeathCryostasisSetup.exe", "link_type": "package"},
+	      {"id": 2, "name": "esdeath-launcher-windows-amd64.exe", "url": "https://gitlab.ramon.moe/pkg/esdeath-launcher-windows-amd64.exe", "link_type": "package"},
+	      {"id": 3, "name": "esdeath-cryostasis-0.6.1.jar", "url": "https://gitlab.ramon.moe/pkg/esdeath-cryostasis-0.6.1.jar", "link_type": "package"}
+	    ]
+	  }
+	}`
+
+	var wire gitlabRelease
+	if err := json.Unmarshal([]byte(body), &wire); err != nil {
+		t.Fatal(err)
+	}
+	release := wire.release()
+
+	if release.TagName != "v0.6.1" {
+		t.Errorf("tag %q, want v0.6.1", release.TagName)
+	}
+	// Three links, and the source archive is not one of them.
+	if len(release.Assets) != 3 {
+		t.Fatalf("decoded %d assets, want the 3 links", len(release.Assets))
+	}
+
+	mod, err := ModAsset(release)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mod.Name != "esdeath-cryostasis-0.6.1.jar" {
+		t.Errorf("mod asset %q", mod.Name)
+	}
+	if mod.URL != "https://gitlab.ramon.moe/pkg/esdeath-cryostasis-0.6.1.jar" {
+		t.Errorf("mod url %q, want the link url", mod.URL)
+	}
+
+	launcher, err := LauncherAsset(release, "windows")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if launcher.Name != "esdeath-launcher-windows-amd64.exe" {
+		t.Errorf("launcher asset %q", launcher.Name)
 	}
 }
 

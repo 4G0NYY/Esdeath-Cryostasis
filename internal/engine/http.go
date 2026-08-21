@@ -14,7 +14,8 @@ import (
 
 var httpClient = &http.Client{Timeout: 5 * time.Minute}
 
-// userAgent identifies both front ends to GitHub, which rejects API requests that send none.
+// userAgent identifies both front ends to the servers they fetch from; some reject an API
+// request that sends none.
 const userAgent = "esdeath-cryostasis"
 
 var errNotFound = errors.New("not found")
@@ -39,8 +40,9 @@ func fetch(url, accept string) (io.ReadCloser, error) {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
 			return nil, errNotFound
-		case resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") == "0":
-			return nil, errors.New("GitHub rate limit reached for this IP, try again in an hour")
+		case resp.StatusCode == http.StatusTooManyRequests ||
+			(resp.StatusCode == http.StatusForbidden && resp.Header.Get("RateLimit-Remaining") == "0"):
+			return nil, fmt.Errorf("rate limited by %s, try again in a few minutes", resp.Request.URL.Host)
 		default:
 			return nil, fmt.Errorf("GET %s returned %s", url, resp.Status)
 		}
@@ -49,7 +51,7 @@ func fetch(url, accept string) (io.ReadCloser, error) {
 }
 
 func getJSON(url string, target any) error {
-	body, err := fetch(url, "application/vnd.github+json")
+	body, err := fetch(url, "application/json")
 	if err != nil {
 		return err
 	}

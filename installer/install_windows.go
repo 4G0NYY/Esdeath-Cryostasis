@@ -75,7 +75,7 @@ func runInstall(opts installOptions) error {
 	if err != nil {
 		return fmt.Errorf("%w\n     The latest release does not carry a Windows launcher yet", err)
 	}
-	ok("%s (%s, %s)", release.TagName, asset.Name, humanSize(asset.Size))
+	ok("%s (%s)", release.TagName, asset.Name)
 
 	step("Installing to %s", dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -84,7 +84,13 @@ func runInstall(opts installOptions) error {
 	if err := engine.DownloadTo(asset.URL, launcherPath); err != nil {
 		return fmt.Errorf("%w\n     If the launcher is already open, close it and run setup again", err)
 	}
-	ok("launcher %s", launcherFileName)
+	// Measured on disk rather than read from the release: GitLab's release links carry a name
+	// and a URL and nothing else, and the downloaded file is the more truthful number anyway.
+	var size int64
+	if info, err := os.Stat(launcherPath); err == nil {
+		size = info.Size()
+	}
+	ok("launcher %s (%s)", launcherFileName, humanSize(size))
 
 	// Leave a copy of ourselves behind so Add/Remove Programs (and a later manual uninstall) has
 	// a stable binary to call: the setup the user downloaded lives in Downloads or a temp folder
@@ -111,7 +117,7 @@ func runInstall(opts installOptions) error {
 	}
 
 	step("Registering with Add/Remove Programs")
-	if err := writeUninstallKey(dir, launcherPath, uninstaller, release.TagName, asset.Size); err != nil {
+	if err := writeUninstallKey(dir, launcherPath, uninstaller, release.TagName, size); err != nil {
 		return fmt.Errorf("could not write the Add/Remove Programs entry: %w", err)
 	}
 	ok("listed as %q", appDisplayName)

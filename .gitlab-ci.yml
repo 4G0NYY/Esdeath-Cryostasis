@@ -61,7 +61,18 @@ build:
             --upload-file "$f" "$PACKAGE_URL/$(basename "$f")"
         done
       fi
+    # The jar's filename carries the version, so the release job cannot spell it out in a
+    # static link. Hand it over as a dotenv variable instead, which is the only way a later
+    # job learns something a previous one worked out.
+    - |
+      set -eu
+      jar="$(find dist -maxdepth 1 -name '*.jar' ! -name '*-sources.jar' | head -n 1)"
+      test -n "$jar"
+      echo "MOD_JAR=$(basename "$jar")" > build.env
+      cat build.env
   artifacts:
+    reports:
+      dotenv: build.env
     name: esdeath-cryostasis
     # The runnable mod jar only, no sources jar.
     paths:
@@ -159,19 +170,28 @@ launcher:linux:
 #
 # A shell runner has no image to declare a toolchain in, and this one carries nothing but Git, so
 # the job installs Go, Node and the Wails CLI itself. They go to a directory outside the build
-# tree that survives between pipelines, so only the first run after a version change pays the
+# tree that survives between pipelines, so only the first run after a version bump pays the
 # download. Set ESDEATH_CI_TOOLS as a CI variable to put that directory somewhere else.
 #
-# The series are pinned rather than the exact patches, so this floats the same way `image:
-# golang:1.23` and `node-version: '20'` float for the container jobs.
+# The toolchain versions are pinned outright, the way gradle.properties pins the Fabric ones:
+# resolving "newest patch of the series" needs an API call and JSON handling in a script that
+# cannot be tested before it runs on the runner, which is not a trade worth making for a patch
+# bump a few times a year. Bump them by hand; go.dev/dl and nodejs.org/dist list what exists.
+#
+# The whole thing is one script block on purpose. It is written for Windows PowerShell 5.1
+# (`Using Shell (powershell) executor`), where two things bite: a pipeline split over several
+# lines loses its later stages, so every statement stays on one line, and a failing cmdlet does
+# not stop the script, so every step that can fail is checked and throws. Strings are built by
+# concatenation rather than interpolation, because `$env:VAR` followed by a dot or a backslash
+# does not always end the variable name where you would expect.
 launcher:windows:
   extends: .tag_or_manual
   stage: build
   tags: [windows]
   variables:
     GIT_SUBMODULE_STRATEGY: none
-    GO_SERIES: "1.23"
-    NODE_SERIES: "20"
+    GO_VERSION: "go1.23.12"
+    NODE_VERSION: "v20.20.2"
     # Pinned to the version the launcher's go.mod requires so the CLI and the runtime never
     # drift apart.
     WAILS_VERSION: "v2.13.0"
@@ -183,112 +203,108 @@ launcher:windows:
       # $ErrorActionPreference is deliberately left at its default. Set to Stop, Windows
       # PowerShell turns anything a native command writes to stderr into a terminating error,
       # and go, npm and wails all report progress there — the build would fail on its own
-      # console output. Failure is caught explicitly instead: -ErrorAction Stop on the cmdlets
-      # that must not fail quietly, exit codes on the commands, and throw on everything else.
+      # console output. Every fallible step below is checked explicitly instead.
       #
       # The progress bar costs more than the download itself in a non-interactive shell, and
-      # Windows PowerShell 5.1 does not negotiate TLS 1.2 unless it is asked to.
+      # 5.1 does not negotiate TLS 1.2 unless it is asked to.
       $ProgressPreference = 'SilentlyContinue'
-      if ($PSVersionTable.PSVersion.Major -lt 6) {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-      }
+      [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-      # PowerShell does not fail a script when a native command exits non-zero, and GitLab only
-      # checks the exit status at the end of each script block, so the build steps are checked
-      # by hand rather than trusting either.
-      function Invoke-Checked([string] $what, [scriptblock] $action) {
-        & $action
-        if ($LASTEXITCODE -ne 0) { throw "$what failed with exit code $LASTEXITCODE" }
-      }
+      $tools = $env:ESDEATH_CI_TOOLS
+      if (-not $tools) { $tools = Join-Path $env:USERPROFILE 'esdeath-ci-tools' }
+      New-Item -ItemType Directory -Force -Path $tools | Out-Null
+      Write-Host ('Toolchain directory: ' + $tools)
 
-      $tools = if ($env:ESDEATH_CI_TOOLS) { $env:ESDEATH_CI_TOOLS } else { Join-Path $env:USERPROFILE 'esdeath-ci-tools' }
-      New-Item -ItemType Directory -Force -Path $tools -ErrorAction Stop | Out-Null
-
-      # Go. The index lists newest first and needs include=all to reach a series that is no
-      # longer one of the two current ones.
-      $goVersion = (Invoke-RestMethod "https://go.dev/dl/?mode=json&include=all" -UseBasicParsing -ErrorAction Stop |
-        Where-Object { $_.stable -and ($_.version -eq "go$env:GO_SERIES" -or $_.version -like "go$env:GO_SERIES.*") } |
-        Select-Object -First 1).version
-      if (-not $goVersion) { throw "go.dev lists no stable Go $env:GO_SERIES release" }
-      $goRoot = Join-Path $tools $goVersion
-      if (-not (Test-Path (Join-Path $goRoot 'bin\go.exe'))) {
-        $zip = Join-Path $env:TEMP "$goVersion.windows-amd64.zip"
-        $staging = Join-Path $env:TEMP "go-unpack-$env:CI_JOB_ID"
-        Invoke-WebRequest "https://go.dev/dl/$goVersion.windows-amd64.zip" -OutFile $zip -UseBasicParsing -ErrorAction Stop
+      $goRoot = Join-Path $tools $env:GO_VERSION
+      $goExe = Join-Path $goRoot 'bin\go.exe'
+      if (-not (Test-Path $goExe)) {
+        $goUrl = 'https://go.dev/dl/' + $env:GO_VERSION + '.windows-amd64.zip'
+        $goZip = Join-Path $env:TEMP ($env:GO_VERSION + '.windows-amd64.zip')
+        $goStaging = Join-Path $env:TEMP ('go-unpack-' + $env:CI_JOB_ID)
+        Write-Host ('Installing ' + $env:GO_VERSION + ' from ' + $goUrl)
+        try { Invoke-WebRequest -Uri $goUrl -OutFile $goZip -UseBasicParsing -ErrorAction Stop } catch { throw ('downloading ' + $goUrl + ' failed: ' + $_) }
+        if (Test-Path $goStaging) { Remove-Item -Recurse -Force $goStaging }
+        # The archive unpacks a bare go/ directory, so it is staged and then named for its
+        # version, which lets a pin bump install alongside rather than on top.
+        Expand-Archive -Path $goZip -DestinationPath $goStaging -Force
         if (Test-Path $goRoot) { Remove-Item -Recurse -Force $goRoot }
-        Expand-Archive -Path $zip -DestinationPath $staging -Force -ErrorAction Stop
-        # The archive unpacks a bare go/ directory; name it for its version so a patch bump
-        # installs alongside rather than on top of what is already there.
-        Move-Item (Join-Path $staging 'go') $goRoot -ErrorAction Stop
-        Remove-Item -Recurse -Force $staging, $zip
-        # Then drop the older patches, so the runner does not collect a toolchain per release.
-        Get-ChildItem $tools -Directory -Filter 'go1.*' | Where-Object { $_.Name -ne $goVersion } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        Move-Item (Join-Path $goStaging 'go') $goRoot
+        Remove-Item -Recurse -Force $goStaging
+        Remove-Item -Force $goZip
+        if (-not (Test-Path $goExe)) { throw ('Go did not install to ' + $goRoot) }
+        # Then drop the older pins, so the runner does not collect a toolchain per bump.
+        foreach ($dir in (Get-ChildItem -Path $tools -Directory)) { if ($dir.Name -like 'go1.*' -and $dir.Name -ne $env:GO_VERSION) { Remove-Item -Recurse -Force $dir.FullName -ErrorAction SilentlyContinue } }
       }
       $env:GOROOT = $goRoot
-      $env:PATH = "$goRoot\bin;$env:PATH"
+      $env:PATH = (Join-Path $goRoot 'bin') + ';' + $env:PATH
 
       # Node, for the Svelte frontend that wails build compiles before the Go build.
-      $nodeVersion = (Invoke-RestMethod 'https://nodejs.org/dist/index.json' -UseBasicParsing -ErrorAction Stop |
-        Where-Object { $_.version -like "v$env:NODE_SERIES.*" } |
-        Select-Object -First 1).version
-      if (-not $nodeVersion) { throw "nodejs.org lists no Node $env:NODE_SERIES release" }
-      $nodeDir = Join-Path $tools "node-$nodeVersion-win-x64"
-      if (-not (Test-Path (Join-Path $nodeDir 'node.exe'))) {
-        $zip = Join-Path $env:TEMP "node-$nodeVersion-win-x64.zip"
-        # This archive already carries its versioned directory, so it unpacks straight into place.
-        Invoke-WebRequest "https://nodejs.org/dist/$nodeVersion/node-$nodeVersion-win-x64.zip" -OutFile $zip -UseBasicParsing -ErrorAction Stop
-        Expand-Archive -Path $zip -DestinationPath $tools -Force -ErrorAction Stop
-        Remove-Item -Force $zip
-        Get-ChildItem $tools -Directory -Filter 'node-v*-win-x64' | Where-Object { $_.Name -ne "node-$nodeVersion-win-x64" } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+      $nodeName = 'node-' + $env:NODE_VERSION + '-win-x64'
+      $nodeDir = Join-Path $tools $nodeName
+      $nodeExe = Join-Path $nodeDir 'node.exe'
+      if (-not (Test-Path $nodeExe)) {
+        $nodeUrl = 'https://nodejs.org/dist/' + $env:NODE_VERSION + '/' + $nodeName + '.zip'
+        $nodeZip = Join-Path $env:TEMP ($nodeName + '.zip')
+        Write-Host ('Installing Node ' + $env:NODE_VERSION + ' from ' + $nodeUrl)
+        try { Invoke-WebRequest -Uri $nodeUrl -OutFile $nodeZip -UseBasicParsing -ErrorAction Stop } catch { throw ('downloading ' + $nodeUrl + ' failed: ' + $_) }
+        # This archive carries its own versioned directory, so it unpacks straight into place.
+        Expand-Archive -Path $nodeZip -DestinationPath $tools -Force
+        Remove-Item -Force $nodeZip
+        if (-not (Test-Path $nodeExe)) { throw ('Node did not install to ' + $nodeDir) }
+        foreach ($dir in (Get-ChildItem -Path $tools -Directory)) { if ($dir.Name -like 'node-v*-win-x64' -and $dir.Name -ne $nodeName) { Remove-Item -Recurse -Force $dir.FullName -ErrorAction SilentlyContinue } }
       }
-      $env:PATH = "$nodeDir;$env:PATH"
+      $env:PATH = $nodeDir + ';' + $env:PATH
 
       # Keep the module cache and the Wails binary with the rest of the toolchain, so a rebuild
       # does not re-download the dependency tree. The stamp file carries the pinned version, so
       # changing WAILS_VERSION reinstalls and an unchanged one costs nothing.
       $env:GOPATH = Join-Path $tools 'gopath'
-      $env:PATH = "$env:GOPATH\bin;$env:PATH"
-      $stamp = Join-Path $tools "wails-$env:WAILS_VERSION.installed"
+      $env:PATH = (Join-Path $env:GOPATH 'bin') + ';' + $env:PATH
+      $stamp = Join-Path $tools ('wails-' + $env:WAILS_VERSION + '.installed')
       if (-not (Test-Path $stamp)) {
-        Invoke-Checked 'go install wails' { go install "github.com/wailsapp/wails/v2/cmd/wails@$env:WAILS_VERSION" }
+        $wailsPackage = 'github.com/wailsapp/wails/v2/cmd/wails@' + $env:WAILS_VERSION
+        Write-Host ('Installing ' + $wailsPackage)
+        go install $wailsPackage
+        if ($LASTEXITCODE -ne 0) { throw ('go install ' + $wailsPackage + ' failed with exit code ' + $LASTEXITCODE) }
         New-Item -ItemType File -Path $stamp -Force | Out-Null
       }
+
       go version
+      if ($LASTEXITCODE -ne 0) { throw 'go is on PATH but not runnable' }
       node --version
+      if ($LASTEXITCODE -ne 0) { throw 'node is on PATH but not runnable' }
       wails version
-    - |
+
       Set-Location (Join-Path $env:CI_PROJECT_DIR 'launcher')
       # wails build runs the frontend install and build first (per wails.json), then the Go build
       # with the embedded dist, then packages the native binary into build/bin. The Linux job's
       # -tags webkit2_41 is not passed here: it exists only to switch WebKitGTK bindings, and the
       # Windows webview is part of the OS.
-      Invoke-Checked 'wails build' { wails build -platform windows/amd64 -clean -o esdeath-cryostasis-launcher }
+      wails build -platform windows/amd64 -clean -o esdeath-cryostasis-launcher
+      if ($LASTEXITCODE -ne 0) { throw ('wails build failed with exit code ' + $LASTEXITCODE) }
 
       $bin = Join-Path (Get-Location) 'build\bin'
       # -o is documented to set the output name verbatim, so the binary lands without an .exe
       # extension; take whatever is actually there rather than depending on that staying true.
-      $built = Get-ChildItem -Path $bin -File -Filter 'esdeath-cryostasis-launcher*' | Select-Object -First 1
-      if (-not $built) { throw "wails build produced no launcher binary in $bin" }
-      Move-Item -Force $built.FullName (Join-Path $bin $env:LAUNCHER_ASSET) -ErrorAction Stop
-      Get-ChildItem $bin | Select-Object Name, Length
-    - |
+      $built = $null
+      foreach ($file in (Get-ChildItem -Path $bin -File)) { if ($file.Name -like 'esdeath-cryostasis-launcher*') { $built = $file; break } }
+      if (-not $built) { throw ('wails build produced no launcher binary in ' + $bin) }
+      $asset = Join-Path $bin $env:LAUNCHER_ASSET
+      Move-Item -Force $built.FullName $asset
+      if (-not (Test-Path $asset)) { throw ('could not stage ' + $asset) }
+      Write-Host ('Built ' + $env:LAUNCHER_ASSET + ' (' + (Get-Item $asset).Length + ' bytes)')
+
       # On a tag, hand the binary to the package registry so the release job can link it.
       if ($env:CI_COMMIT_TAG) {
-        $asset = Join-Path $env:CI_PROJECT_DIR "launcher\build\bin\$env:LAUNCHER_ASSET"
-        Invoke-WebRequest -Method Put -Uri "$env:PACKAGE_URL/$env:LAUNCHER_ASSET" -Headers @{ 'JOB-TOKEN' = $env:CI_JOB_TOKEN } -InFile $asset -UseBasicParsing -ErrorAction Stop | Out-Null
-        Write-Host "Uploaded $env:LAUNCHER_ASSET to $env:PACKAGE_URL"
+        $uploadUrl = $env:PACKAGE_URL + '/' + $env:LAUNCHER_ASSET
+        Write-Host ('Uploading to ' + $uploadUrl)
+        try { Invoke-WebRequest -Method Put -Uri $uploadUrl -Headers @{ 'JOB-TOKEN' = $env:CI_JOB_TOKEN } -InFile $asset -UseBasicParsing -ErrorAction Stop | Out-Null } catch { throw ('uploading ' + $env:LAUNCHER_ASSET + ' failed: ' + $_) }
       }
   artifacts:
     name: esdeath-launcher-windows
     paths:
       - launcher/build/bin/esdeath-launcher-windows-amd64.exe
     expire_in: 30 days
-
-launcher:macos:
-  extends: .launcher
-  tags: [macos]
-  variables:
-    PLATFORM: darwin/universal
 
 # The backend container is the third shippable, and the odd one out: it does not attach to
 # the release, it publishes to the container registry so a `docker compose pull` can redeploy
@@ -357,8 +373,13 @@ release:
         - name: esdeath-launcher-windows-amd64.exe
           url: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/esdeath-cryostasis/${CI_COMMIT_TAG}/esdeath-launcher-windows-amd64.exe
           link_type: package
-        # The mod jar's filename carries the version, so it is linked through the
-        # package registry's directory listing rather than guessed here.
-        - name: Mod jar and all release files
+        # MOD_JAR comes from the build job's dotenv report. The launcher looks for a
+        # link whose name ends in .jar to install the mod, so this one is not optional.
+        - name: $MOD_JAR
+          url: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/esdeath-cryostasis/${CI_COMMIT_TAG}/${MOD_JAR}
+          link_type: package
+        # Named so it cannot be mistaken for a file: the engine matches assets by name, and a
+        # link called "mod jar" or "launcher" would be picked up as one.
+        - name: Browse every file in the package registry
           url: ${CI_PROJECT_URL}/-/packages
           link_type: other

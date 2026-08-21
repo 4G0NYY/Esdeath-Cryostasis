@@ -10,7 +10,11 @@ package engine
 const (
 	RepoOwner = "4G0NYY"
 	RepoName  = "Esdeath-Cryostasis"
-	RepoURL   = "https://gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis"
+	// RepoHost is the self-hosted GitLab the project lives on. The release API, the generic
+	// package registry the releases link to, and the page a user is sent to are all under it,
+	// so moving hosts again is this one line plus the owner and name above.
+	RepoHost = "https://gitlab.ramon.moe"
+	RepoURL  = RepoHost + "/" + RepoOwner + "/" + RepoName
 
 	ProfileKey  = "esdeath-cryostasis"
 	ProfileName = "Esdeath Cryostasis"
