@@ -120,3 +120,4 @@ settings, and drag panel headers to rearrange.
 ## Credits
 
 Original EsdeathClient by txb1. This rebuild is an independent modernization.
+(Also adds a few little hacks ;)
