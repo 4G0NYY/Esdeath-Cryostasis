@@ -23,6 +23,11 @@ launcher/frontend/node_modules/
 launcher/frontend/dist/
 launcher/build/bin/
 
+# The Windows resource object (icon, manifest, version block). The launcher CI job generates it
+# with go-winres right before the cross-compile, and `go build` links any .syso it finds in the
+# package directory, so a local Windows build leaves one here too. Generated, not source.
+launcher/*.syso
+
 # The rest of what `wails build` leaves behind in frontend/. wailsjs/ is the JS binding layer
 # it regenerates from the Go methods on every build, and the .md5 is the stamp it uses to skip
 # `npm install` when package.json has not changed. Both are rebuilt from source, so neither

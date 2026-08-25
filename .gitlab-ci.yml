@@ -11,10 +11,10 @@
 # end of it. A manual "Run pipeline" from the UI stays possible so the pipeline can be
 # exercised without inventing a throwaway tag.
 #
-# Runners: everything except the Windows launcher runs on the container runners (tag `docker`).
-# The Windows launcher builds on the dedicated shell runner (tag `windows`), which is a plain
-# machine with Git on it and no container image, so that job installs its own toolchain and is
-# written in PowerShell rather than sh. macOS still has no runner, so that launcher stays parked.
+# Runners: everything runs on the container runners (tag `docker`). The Windows launcher used to
+# build natively on a shell runner (tag `windows`) that bootstrapped its own toolchain in
+# PowerShell; it now cross-compiles alongside the setup installer, so no Windows machine is in
+# the loop and that runner is free. macOS still has no runner, so that launcher stays parked.
 #
 # One difference from the GitHub original: there, `build` and `installer` each called
 # softprops/action-gh-release and had to be serialised so they did not race to create
@@ -130,9 +130,9 @@ installer:
 # lost: register a runner with the `macos` tag and it works as written. The Linux one is manual
 # purely to keep the siblings symmetrical; it will run on the container runner as-is.
 #
-# Windows is not built from this template. It runs on a shell runner rather than a container,
-# so it needs its own PowerShell script and toolchain bootstrap, and it is the only launcher
-# that ships in the release; it is spelled out in full below.
+# Windows is not built from this template either. It is the only launcher that ships in a
+# release, and it is cross-compiled without the Wails CLI rather than built natively, so it
+# shares none of the steps above; it is spelled out in full below.
 .launcher:
   extends: .tag_or_manual
   stage: build
@@ -155,7 +155,8 @@ installer:
 launcher:linux:
   extends: .launcher
   tags: [docker]
-  image: golang:1.23
+  # As in launcher:windows, 1.25 is what launcher/go.mod asks for.
+  image: golang:1.25
   variables:
     PLATFORM: linux/amd64
   before_script:
@@ -164,142 +165,95 @@ launcher:linux:
     # then switches Wails from its default 4.0 bindings to the 4.1 package installed here.
     - apt-get update && apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev nodejs npm
 
-# The Windows launcher, built on the dedicated shell runner and attached to the release. This is
-# the launcher the setup installer downloads on the player's machine, so unlike its parked
-# siblings it is a required job: if it fails, no release is created.
+# The Windows launcher, and the only launcher that ships in a release: it is what the setup
+# installer downloads on the player's machine, so unlike its parked siblings it is a required
+# job, and if it fails no release is created.
 #
-# A shell runner has no image to declare a toolchain in, and this one carries nothing but Git, so
-# the job installs Go, Node and the Wails CLI itself. They go to a directory outside the build
-# tree that survives between pipelines, so only the first run after a version bump pays the
-# download. Set ESDEATH_CI_TOOLS as a CI variable to put that directory somewhere else.
+# It is not built from the template above, and it no longer builds on Windows at all. Wails'
+# Windows backend is pure Go - the webview is an OS component driven over COM, so nothing here
+# needs cgo - which means the launcher cross-compiles from the container runner exactly the way
+# the setup installer already does, and the shell runner drops out of the pipeline.
 #
-# The toolchain versions are pinned outright, the way gradle.properties pins the Fabric ones:
-# resolving "newest patch of the series" needs an API call and JSON handling in a script that
-# cannot be tested before it runs on the runner, which is not a trade worth making for a patch
-# bump a few times a year. Bump them by hand; go.dev/dl and nodejs.org/dist list what exists.
+# It also does not use the Wails CLI. `wails build` is a wrapper: it runs the frontend build
+# declared in wails.json, regenerates the frontend/wailsjs bindings, compiles a Windows resource
+# file, and then calls `go build` with a fixed set of flags. Everything but the bindings is
+# reproduced below. The bindings are dead weight for this project: the frontend reaches Go
+# through the hand-written typed bridge in frontend/src/lib/bridge.ts, over the window.go and
+# window.runtime globals the binary injects at runtime, and never imports the generated module,
+# which is why it is gitignored and why nothing misses it.
 #
-# The whole thing is one script block on purpose. It is written for Windows PowerShell 5.1
-# (`Using Shell (powershell) executor`), where two things bite: a pipeline split over several
-# lines loses its later stages, so every statement stays on one line, and a failing cmdlet does
-# not stop the script, so every step that can fail is checked and throws. Strings are built by
-# concatenation rather than interpolation, because `$env:VAR` followed by a dot or a backslash
-# does not always end the variable name where you would expect.
+# Dropping the CLI is not only a simplification. Installing it compiles an unsigned wails.exe on
+# the runner, and Windows Application Control blocks a freshly built binary that carries no
+# reputation: that is what broke the v0.6.3 pipeline, where go.exe and node.exe were let through
+# and wails.exe was not. Nothing built on the fly is executed here, so there is nothing left for
+# such a policy to block.
 launcher:windows:
   extends: .tag_or_manual
   stage: build
-  tags: [windows]
+  tags: [docker]
+  # 1.25 because launcher/go.mod asks for it. On an older image the build still worked, by
+  # quietly downloading a second toolchain on every run; pinning the image states the version
+  # once and keeps the job to the toolchain it declares.
+  image: golang:1.25
   variables:
     GIT_SUBMODULE_STRATEGY: none
-    GO_VERSION: "go1.23.12"
+    # Pinned by hand, the way gradle.properties pins the Fabric versions; nodejs.org/dist lists
+    # what exists. Debian's own nodejs is older than the Vite the frontend builds with.
     NODE_VERSION: "v20.20.2"
-    # Pinned to the version the launcher's go.mod requires so the CLI and the runtime never
-    # drift apart.
-    WAILS_VERSION: "v2.13.0"
+    # Writes the .syso holding the icon, the DPI-aware GUI manifest and the version block. It is
+    # the one part of `wails build` that plain `go build` has no answer for, and without it the
+    # launcher would ship with the default Go icon and blur on a scaled display.
+    WINRES_VERSION: "v0.3.3"
     # The name the release carries. engine.LauncherAsset matches on "launcher" plus the OS
     # token, so this name is what lets the installer find the binary in a release.
     LAUNCHER_ASSET: "esdeath-launcher-windows-amd64.exe"
-  script:
+  before_script:
+    # The .tar.gz rather than the smaller .tar.xz: this image has gzip but no xz-utils.
     - |
-      # $ErrorActionPreference is deliberately left at its default. Set to Stop, Windows
-      # PowerShell turns anything a native command writes to stderr into a terminating error,
-      # and go, npm and wails all report progress there, so the build would fail on its own
-      # console output. Every fallible step below is checked explicitly instead.
-      #
-      # The progress bar costs more than the download itself in a non-interactive shell, and
-      # 5.1 does not negotiate TLS 1.2 unless it is asked to.
-      $ProgressPreference = 'SilentlyContinue'
-      [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-      $tools = $env:ESDEATH_CI_TOOLS
-      if (-not $tools) { $tools = Join-Path $env:USERPROFILE 'esdeath-ci-tools' }
-      New-Item -ItemType Directory -Force -Path $tools | Out-Null
-      Write-Host ('Toolchain directory: ' + $tools)
-
-      $goRoot = Join-Path $tools $env:GO_VERSION
-      $goExe = Join-Path $goRoot 'bin\go.exe'
-      if (-not (Test-Path $goExe)) {
-        $goUrl = 'https://go.dev/dl/' + $env:GO_VERSION + '.windows-amd64.zip'
-        $goZip = Join-Path $env:TEMP ($env:GO_VERSION + '.windows-amd64.zip')
-        $goStaging = Join-Path $env:TEMP ('go-unpack-' + $env:CI_JOB_ID)
-        Write-Host ('Installing ' + $env:GO_VERSION + ' from ' + $goUrl)
-        try { Invoke-WebRequest -Uri $goUrl -OutFile $goZip -UseBasicParsing -ErrorAction Stop } catch { throw ('downloading ' + $goUrl + ' failed: ' + $_) }
-        if (Test-Path $goStaging) { Remove-Item -Recurse -Force $goStaging }
-        # The archive unpacks a bare go/ directory, so it is staged and then named for its
-        # version, which lets a pin bump install alongside rather than on top.
-        Expand-Archive -Path $goZip -DestinationPath $goStaging -Force
-        if (Test-Path $goRoot) { Remove-Item -Recurse -Force $goRoot }
-        Move-Item (Join-Path $goStaging 'go') $goRoot
-        Remove-Item -Recurse -Force $goStaging
-        Remove-Item -Force $goZip
-        if (-not (Test-Path $goExe)) { throw ('Go did not install to ' + $goRoot) }
-        # Then drop the older pins, so the runner does not collect a toolchain per bump.
-        foreach ($dir in (Get-ChildItem -Path $tools -Directory)) { if ($dir.Name -like 'go1.*' -and $dir.Name -ne $env:GO_VERSION) { Remove-Item -Recurse -Force $dir.FullName -ErrorAction SilentlyContinue } }
-      }
-      $env:GOROOT = $goRoot
-      $env:PATH = (Join-Path $goRoot 'bin') + ';' + $env:PATH
-
-      # Node, for the Svelte frontend that wails build compiles before the Go build.
-      $nodeName = 'node-' + $env:NODE_VERSION + '-win-x64'
-      $nodeDir = Join-Path $tools $nodeName
-      $nodeExe = Join-Path $nodeDir 'node.exe'
-      if (-not (Test-Path $nodeExe)) {
-        $nodeUrl = 'https://nodejs.org/dist/' + $env:NODE_VERSION + '/' + $nodeName + '.zip'
-        $nodeZip = Join-Path $env:TEMP ($nodeName + '.zip')
-        Write-Host ('Installing Node ' + $env:NODE_VERSION + ' from ' + $nodeUrl)
-        try { Invoke-WebRequest -Uri $nodeUrl -OutFile $nodeZip -UseBasicParsing -ErrorAction Stop } catch { throw ('downloading ' + $nodeUrl + ' failed: ' + $_) }
-        # This archive carries its own versioned directory, so it unpacks straight into place.
-        Expand-Archive -Path $nodeZip -DestinationPath $tools -Force
-        Remove-Item -Force $nodeZip
-        if (-not (Test-Path $nodeExe)) { throw ('Node did not install to ' + $nodeDir) }
-        foreach ($dir in (Get-ChildItem -Path $tools -Directory)) { if ($dir.Name -like 'node-v*-win-x64' -and $dir.Name -ne $nodeName) { Remove-Item -Recurse -Force $dir.FullName -ErrorAction SilentlyContinue } }
-      }
-      $env:PATH = $nodeDir + ';' + $env:PATH
-
-      # Keep the module cache and the Wails binary with the rest of the toolchain, so a rebuild
-      # does not re-download the dependency tree. The stamp file carries the pinned version, so
-      # changing WAILS_VERSION reinstalls and an unchanged one costs nothing.
-      $env:GOPATH = Join-Path $tools 'gopath'
-      $env:PATH = (Join-Path $env:GOPATH 'bin') + ';' + $env:PATH
-      $stamp = Join-Path $tools ('wails-' + $env:WAILS_VERSION + '.installed')
-      if (-not (Test-Path $stamp)) {
-        $wailsPackage = 'github.com/wailsapp/wails/v2/cmd/wails@' + $env:WAILS_VERSION
-        Write-Host ('Installing ' + $wailsPackage)
-        go install $wailsPackage
-        if ($LASTEXITCODE -ne 0) { throw ('go install ' + $wailsPackage + ' failed with exit code ' + $LASTEXITCODE) }
-        New-Item -ItemType File -Path $stamp -Force | Out-Null
-      }
-
-      go version
-      if ($LASTEXITCODE -ne 0) { throw 'go is on PATH but not runnable' }
+      set -eu
+      node_dist="node-${NODE_VERSION}-linux-x64"
+      curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/${node_dist}.tar.gz" -o /tmp/node.tar.gz
+      mkdir -p /opt/node
+      tar -xzf /tmp/node.tar.gz -C /opt/node --strip-components=1
+      rm -f /tmp/node.tar.gz
+      export PATH="/opt/node/bin:$PATH"
       node --version
-      if ($LASTEXITCODE -ne 0) { throw 'node is on PATH but not runnable' }
-      wails version
-
-      Set-Location (Join-Path $env:CI_PROJECT_DIR 'launcher')
-      # wails build runs the frontend install and build first (per wails.json), then the Go build
-      # with the embedded dist, then packages the native binary into build/bin. The Linux job's
-      # -tags webkit2_41 is not passed here: it exists only to switch WebKitGTK bindings, and the
-      # Windows webview is part of the OS.
-      wails build -platform windows/amd64 -clean -o esdeath-cryostasis-launcher
-      if ($LASTEXITCODE -ne 0) { throw ('wails build failed with exit code ' + $LASTEXITCODE) }
-
-      $bin = Join-Path (Get-Location) 'build\bin'
-      # -o is documented to set the output name verbatim, so the binary lands without an .exe
-      # extension; take whatever is actually there rather than depending on that staying true.
-      $built = $null
-      foreach ($file in (Get-ChildItem -Path $bin -File)) { if ($file.Name -like 'esdeath-cryostasis-launcher*') { $built = $file; break } }
-      if (-not $built) { throw ('wails build produced no launcher binary in ' + $bin) }
-      $asset = Join-Path $bin $env:LAUNCHER_ASSET
-      Move-Item -Force $built.FullName $asset
-      if (-not (Test-Path $asset)) { throw ('could not stage ' + $asset) }
-      Write-Host ('Built ' + $env:LAUNCHER_ASSET + ' (' + (Get-Item $asset).Length + ' bytes)')
-
-      # On a tag, hand the binary to the package registry so the release job can link it.
-      if ($env:CI_COMMIT_TAG) {
-        $uploadUrl = $env:PACKAGE_URL + '/' + $env:LAUNCHER_ASSET
-        Write-Host ('Uploading to ' + $uploadUrl)
-        try { Invoke-WebRequest -Method Put -Uri $uploadUrl -Headers @{ 'JOB-TOKEN' = $env:CI_JOB_TOKEN } -InFile $asset -UseBasicParsing -ErrorAction Stop | Out-Null } catch { throw ('uploading ' + $env:LAUNCHER_ASSET + ' failed: ' + $_) }
-      }
+      npm --version
+  script:
+    - cd launcher
+    # The Go build embeds frontend/dist, so the frontend is built before the compile rather than
+    # alongside it. These are the two steps wails.json declares as frontend:install and
+    # frontend:build, with `ci` for `install` because the lockfile is committed.
+    - npm --prefix frontend ci
+    - npm --prefix frontend run build
+    # A Windows version block is four numbers, so the tag loses its leading v and any
+    # pre-release suffix. A manual run has no tag to read and stamps 0.0.0.
+    - |
+      set -eu
+      ver="$(printf '%s' "${CI_COMMIT_TAG:-}" | sed 's/^v//; s/-.*$//')"
+      test -n "$ver" || ver="0.0.0"
+      go run "github.com/tc-hib/go-winres@${WINRES_VERSION}" simply --arch amd64 --manifest gui \
+        --icon build/appicon.png --product-name "Esdeath: Cryostasis Launcher" \
+        --file-description "Esdeath: Cryostasis Launcher" --copyright "4G0NYY" \
+        --original-filename "$LAUNCHER_ASSET" --product-version "$ver" --file-version "$ver"
+      test -f rsrc_windows_amd64.syso
+    # `go build` links any .syso sitting in the package directory, so the resources above need no
+    # flag of their own. The tags and ldflags are the ones Wails v2.13.0 passes for a production
+    # desktop build: `production` serves the embedded assets instead of a dev server, and
+    # -H windowsgui keeps a console window from opening behind the app.
+    - |
+      set -eu
+      mkdir -p build/bin
+      GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
+        -tags "desktop,production" -ldflags "-w -s -H windowsgui" \
+        -o "build/bin/$LAUNCHER_ASSET" .
+      ls -l "build/bin/$LAUNCHER_ASSET"
+    # On a tag, hand the binary to the package registry so the release job can link it.
+    - |
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+          --upload-file "build/bin/$LAUNCHER_ASSET" "$PACKAGE_URL/$LAUNCHER_ASSET"
+      fi
   artifacts:
     name: esdeath-launcher-windows
     paths:
