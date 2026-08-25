@@ -13,12 +13,14 @@ import moe.ramon.cryostasis.modules.hud.XyzModule;
 import moe.ramon.cryostasis.modules.combat.AutoDodgeModule;
 import moe.ramon.cryostasis.modules.combat.KillauraModule;
 import moe.ramon.cryostasis.modules.combat.MoreParticlesModule;
+import moe.ramon.cryostasis.modules.combat.ReachModule;
 import moe.ramon.cryostasis.modules.combat.SharpnessModule;
 import moe.ramon.cryostasis.modules.misc.AutoTextModule;
 import moe.ramon.cryostasis.modules.misc.DiscordPresenceModule;
 import moe.ramon.cryostasis.modules.misc.TabGuiModule;
 import moe.ramon.cryostasis.modules.misc.TakeAllModule;
 import moe.ramon.cryostasis.modules.movement.AutoPathModule;
+import moe.ramon.cryostasis.modules.movement.FlyModule;
 import moe.ramon.cryostasis.modules.movement.JesusModule;
 import moe.ramon.cryostasis.modules.movement.NoCobwebModule;
 import moe.ramon.cryostasis.modules.movement.NoSoulsandModule;
@@ -130,6 +132,7 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new JesusModule());
 		modules.register(new NoCobwebModule());
 		modules.register(new NoSoulsandModule());
+		modules.register(new FlyModule());
 		// Render
 		modules.register(new HitboxModule());
 		modules.register(new BlockOutlineModule());
@@ -145,6 +148,7 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new SharpnessModule());
 		modules.register(new KillauraModule());
 		modules.register(new AutoDodgeModule());
+		modules.register(new ReachModule());
 		// Player
 		modules.register(new AutoToolModule());
 		modules.register(new AutoEquipModule());

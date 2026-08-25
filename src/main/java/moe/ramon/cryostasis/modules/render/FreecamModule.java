@@ -152,18 +152,20 @@ public final class FreecamModule extends Module {
 			step *= 2.0;
 		}
 		double forward = axis(mc.options.keyUp, mc.options.keyDown);
-		double strafe = axis(mc.options.keyRight, mc.options.keyLeft);
+		// Left positive, because the rotation below is vanilla's own and that is the sign it
+		// reads: feeding it a right-positive strafe puts the camera out the wrong side.
+		double left = axis(mc.options.keyLeft, mc.options.keyRight);
 		double vertical = axis(mc.options.keyJump, mc.options.keyShift);
-		if (forward != 0.0 || strafe != 0.0) {
+		if (forward != 0.0 || left != 0.0) {
 			// Normalize so a diagonal is not faster than a straight line.
-			double length = Math.sqrt(forward * forward + strafe * strafe);
+			double length = Math.sqrt(forward * forward + left * left);
 			forward /= length;
-			strafe /= length;
+			left /= length;
 			double radians = Math.toRadians(yaw);
 			double sin = Math.sin(radians);
 			double cos = Math.cos(radians);
-			x += (strafe * cos - forward * sin) * step;
-			z += (strafe * sin + forward * cos) * step;
+			x += (left * cos - forward * sin) * step;
+			z += (left * sin + forward * cos) * step;
 		}
 		y += vertical * step;
 	}

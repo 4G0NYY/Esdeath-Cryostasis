@@ -30,12 +30,24 @@ resize the window.
 | NoCobweb | Walk through cobwebs at full speed, ignoring their slowdown | none |
 | NoSoulsand | Cross soul sand at full speed, ignoring its slowdown | none |
 | Jesus | Walk on the surface of water instead of swimming in it | Lava on/off |
+| Fly | Flies you wherever you point | Mode (Motion, Abilities), Speed |
 
 Jesus works by giving the liquid a solid top, the same way vanilla lets a strider stand on
 lava, so you walk, sprint, and jump on water exactly as you would on land. Hold sneak to sink,
 and swimming and diving underneath are unchanged. Lava is a separate toggle and off by default.
 Like the two below it, it only moves the local player: singleplayer is consistent, but a
 fair-play multiplayer server still has you in the water and may pull you back.
+
+Fly steers on the movement keys, with jump and sneak for up and down and sprint held for
+double speed, the same controls Freecam uses. The Mode setting picks which of the two kinds of
+flight you get. Abilities sets the creative flight flags and tells the server about them, so you
+fly through the game's own code and it looks smooth; that works in creative and on a server with
+`allow-flight` on, and where flight is not permitted the server clears the flags again and the
+flight stops. Motion asks nobody: it overwrites your velocity every tick, so gravity never
+accumulates, which is why it works in singleplayer survival where Abilities does not. What it
+cannot do is hide, and a fair-play server watching your position packets will pull you back down
+or kick you. Fall distance is cleared every tick either way, so landing is safe locally; the
+server banks its own from the movement packets, so turn on Zoot before you land on one.
 
 NoCobweb and NoSoulsand only touch the local player. In singleplayer they cover the
 integrated server too, so there is no rubber-banding; on a fair-play multiplayer server the
@@ -86,6 +98,29 @@ camera and just free the direction.
 A press is ignored while a menu is open, so the key is safe to hold while typing, and a
 release always counts, so nothing can leave your view stuck outside your body. If Freecam has
 the camera out, it keeps it and Freelook stays out of its way.
+
+## Combat
+
+| Module | What it does | Settings |
+|---|---|---|
+| Killaura | Hits living entities that come within reach, by itself | Reach, Hits Per Second, Full Damage, Targets (Players, Mobs, All), Line of Sight, Rotate |
+| AutoDodge | Strafes you out of the path of incoming arrows | Range, Strength, Only Grounded |
+| Reach | Lets you hit and touch things further away | Entities, Blocks |
+
+Killaura swings through the same call your own click does, so AutoTool still swaps to your best
+weapon and the crit particles below still fire. Hits Per Second caps how often it swings, up to
+the twenty a second that one swing per client tick allows. Full Damage adds the game's own gate
+on top of that: a hit thrown before the weapon's cooldown finishes is scaled down, so leaving it
+on trades swings for damage per swing, and turning it off spends those extra swings on the weak
+hits you would get from mashing the button yourself. Reach is measured from your eye to the
+nearest point of the target's box, which is what the game's own range check measures.
+
+Reach raises the two distances the game keeps as attributes, 3 blocks to an entity and 4.5 to a
+block by default, and everything downstream follows: the crosshair picks a target further out,
+and the check on the swing accepts it. Neither setting ever shortens anything, so creative keeps
+the longer reach it already has. In singleplayer this covers the integrated server too, so the
+hits land. On a fair-play multiplayer server the check that counts is the server's own, and past
+roughly 3 blocks of entity reach it throws the hits away, whatever Killaura is set to.
 
 ## Combat feedback
 

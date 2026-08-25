@@ -1,6 +1,8 @@
 package moe.ramon.cryostasis.mixin.client;
 
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import moe.ramon.cryostasis.Cryostasis;
+import moe.ramon.cryostasis.modules.combat.ReachModule;
 import moe.ramon.cryostasis.modules.movement.SafeWalkModule;
 import moe.ramon.cryostasis.modules.player.FastBreakModule;
 import moe.ramon.cryostasis.modules.player.NoHungerModule;
@@ -84,5 +86,39 @@ public abstract class PlayerMixin {
 		if (noHunger != null && noHunger.isEnabled()) {
 			ci.cancel();
 		}
+	}
+
+	/**
+	 * Reach: raise the distance at which an entity can be hit. Everything that cares about melee
+	 * range reads this one method, so raising it here moves the crosshair's pick and the range
+	 * check on the swing together. Guarded by UUID like FastBreak above, so in singleplayer the
+	 * integrated server's copy of the player gets the same answer and accepts the hit instead of
+	 * rejecting it as out of range.
+	 */
+	@ModifyReturnValue(method = "entityInteractionRange", at = @At("RETURN"))
+	private double cryostasis$entityReach(double original) {
+		ReachModule reach = cryostasis$activeReach();
+		return reach == null ? original : Math.max(original, reach.entityRange());
+	}
+
+	/** Reach: the same for blocks, which governs how far away one can be mined or placed. */
+	@ModifyReturnValue(method = "blockInteractionRange", at = @At("RETURN"))
+	private double cryostasis$blockReach(double original) {
+		ReachModule reach = cryostasis$activeReach();
+		return reach == null ? original : Math.max(original, reach.blockRange());
+	}
+
+	private ReachModule cryostasis$activeReach() {
+		Cryostasis cryostasis = Cryostasis.get();
+		if (cryostasis == null) {
+			return null;
+		}
+		Player self = (Player) (Object) this;
+		Player local = Minecraft.getInstance().player;
+		if (local == null || !self.getUUID().equals(local.getUUID())) {
+			return null;
+		}
+		ReachModule reach = cryostasis.getModuleManager().get(ReachModule.class);
+		return reach != null && reach.isEnabled() ? reach : null;
 	}
 }

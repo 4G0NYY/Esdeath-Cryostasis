@@ -23,6 +23,14 @@ launcher/frontend/node_modules/
 launcher/frontend/dist/
 launcher/build/bin/
 
+# The rest of what `wails build` leaves behind in frontend/. wailsjs/ is the JS binding layer
+# it regenerates from the Go methods on every build, and the .md5 is the stamp it uses to skip
+# `npm install` when package.json has not changed. Both are rebuilt from source, so neither
+# belongs in the tree; without these two lines any local launcher build leaves the working
+# copy dirty.
+launcher/frontend/wailsjs/
+launcher/frontend/package.json.md5
+
 # Loom / Fabric
 run/
 *.log
