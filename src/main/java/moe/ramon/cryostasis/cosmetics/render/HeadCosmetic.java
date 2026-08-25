@@ -2,6 +2,7 @@ package moe.ramon.cryostasis.cosmetics.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import moe.ramon.cryostasis.cosmetics.CosmeticTextures;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -14,6 +15,10 @@ import net.minecraft.resources.ResourceLocation;
  * Base for cosmetics worn on the head. Aligns to the player's head part so the cosmetic
  * inherits head pitch and yaw automatically, which is what nearly all of the original
  * head cosmetics did.
+ *
+ * The texture passed in is the bundled one; the one actually drawn is resolved every frame, so a
+ * cosmetic whose texture lives on the CDN picks it up as soon as it has downloaded and falls back
+ * to the bundled bytes until then.
  */
 public abstract class HeadCosmetic implements Cosmetic {
 	private final String key;
@@ -36,7 +41,8 @@ public abstract class HeadCosmetic implements Cosmetic {
 		pose.pushPose();
 		// Inherit the head transform, then draw the cosmetic in head-local space.
 		model.head.translateAndRotate(pose);
-		VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(texture, false));
+		VertexConsumer consumer = buffers.getBuffer(
+				RenderType.entityCutoutNoCull(CosmeticTextures.resolve(key, texture), false));
 		part.render(pose, consumer, packedLight, OverlayTexture.NO_OVERLAY);
 		pose.popPose();
 	}

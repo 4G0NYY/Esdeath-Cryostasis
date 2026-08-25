@@ -6,8 +6,8 @@ contract, and this one is now the only backend.
 
 The wire contract is owned by `../docs/backend-api.md`; the design is
 `../docs/backend-architecture.md`. This service implements both, with the deltas noted in
-architecture section 9 (chat dropped, `has` is a catalogue check, a batch endpoint added,
-session-proof auth added).
+architecture section 9 (`has` is a catalogue check, a batch endpoint added, session-proof auth
+added, ranks given a write path, global chat ported as a polled log).
 
 ## Layout
 
@@ -17,7 +17,7 @@ app/
   config.py        pydantic-settings, env driven (CRYOSTASIS_ prefix)
   api/
     deps.py        DI: repo, settings, current caller, rate limiter
-    v1/            meta (version, capes), players, cosmetics, auth
+    v1/            meta (version, capes, ranks), players, cosmetics, auth, chat
   domain/          pure schemas and rules (no FastAPI, no SQLAlchemy)
   repo/            base Protocol, memory.py (dev/tests), postgres.py
   storage/         CDN URL building from object keys
@@ -69,6 +69,10 @@ All variables take the `CRYOSTASIS_` prefix (see `.env.example`). Only
 | `CRYOSTASIS_PRESENCE_WINDOW_SECONDS` | `120` | A player is online while last seen inside this window. |
 | `CRYOSTASIS_CDN_BASE_URL` | cdn.cryostasis.ramon.moe | Base for texture URLs built from object keys. |
 | `CRYOSTASIS_RATE_LIMIT_PER_MINUTE` | `120` | Per authenticated UUID, not per IP. |
+| `CRYOSTASIS_ADMIN_TOKEN` | empty | Guards rank assignment. Empty disables that surface entirely. |
+| `CRYOSTASIS_CHAT_MAX_LENGTH` | `256` | Longest global chat message. |
+| `CRYOSTASIS_CHAT_RATE_PER_MINUTE` | `12` | Chat's own bucket, separate from the general limit. |
+| `CRYOSTASIS_CHAT_RETENTION_HOURS` | `24` | Messages older than this are swept on the next post. |
 | `CRYOSTASIS_PORT` | `8080` | Listen port in the container. |
 
 ## Auth
@@ -85,6 +89,47 @@ Off by default so the client can be tested before its side of the handshake ship
 No OAuth and no Azure app: the Mojang session handshake every server already performs is
 enough to prove UUID ownership. OAuth remains a Phase 5 concern for the alt-account manager
 only.
+
+Step 3 also records the username Mojang confirmed onto the player row. That is the only way a
+name enters this service, and it is what global chat renders, so nobody can post under a name
+they do not hold.
+
+## Ranks and the admin surface
+
+Ranks are a display tag plus a staff flag: `Default`, `Premium`, `Epic`, `Chef`, `Mod`, `Admin`.
+Cosmetics stay free for everyone, so a rank buys colour in chat and, for the two staff tiers, the
+chat moderation calls.
+
+`GET /api/ranks` serves the registry with each rank's colour, so the client never keeps its own
+palette. Assigning one is the service's only admin route, and it is deliberately not something a
+player can do to their own record:
+
+```
+curl -X PUT https://cryostasis.ramon.moe/api/players/<uuid>/rank \
+     -H 'Content-Type: application/json' -H "X-Admin-Token: $CRYOSTASIS_ADMIN_TOKEN" \
+     -d '{"rank":"Chef"}'
+```
+
+With `CRYOSTASIS_ADMIN_TOKEN` unset the route answers 403 for everyone, so a deployment that
+forgot to configure one cannot have its ranks rewritten.
+
+## Global chat
+
+One channel shared by every client, whichever game server each player is on. Reads are a cursor
+poll, held open by `wait` so an idle reader is cheap; writes take the session token. See
+architecture section 12 for why it is polled rather than pushed, and `../docs/backend-api.md`
+section 6 for the wire shape.
+
+```
+curl 'localhost:8000/api/chat?limit=5'                    # backlog, plus a cursor
+curl 'localhost:8000/api/chat?after=12&wait=25'           # held open until something lands
+curl -X POST localhost:8000/api/chat \
+     -H 'Content-Type: application/json' -d '{"message":"hello"}'
+```
+
+Moderation is available to a staff rank's bearer token or to the admin token: `POST /api/chat/mutes`
+(by UUID or by the username a moderator reads off a chat line), `DELETE /api/chat/mutes/{player}`,
+`GET /api/chat/mutes`, and `DELETE /api/chat/{id}` to remove a message.
 
 ## Database and migrations
 

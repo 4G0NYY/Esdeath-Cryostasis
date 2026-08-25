@@ -86,8 +86,8 @@ capes and cosmetics move behind object storage plus a CDN.
 | removeMeACosmetic | `DELETE /players/{uuid}/cosmetics/{cosmetic}` | - | `{ "ok": true }` |
 | setMyCape | `PUT /players/{uuid}/cape` | `{ "cape": "..." }` | `204` |
 | hasThePlayerTheCosmetic | `GET /players/{uuid}/cosmetics/{cosmetic}` | - | `{ "has": true }` |
-| getMSG | `GET /chat` | - | `{ "message": "...", "from": "..." }` |
-| sendMSG | `POST /chat` | `{ "message": "..." }` | `204` |
+| getMSG | `GET /chat` | - | `{ "messages": [...], "cursor": N }` |
+| sendMSG | `POST /chat` | `{ "message": "..." }` | the stored message |
 
 The most important addition over the original is authentication: the new endpoints must
 verify that the caller owns the UUID it acts on (via the OAuth-issued token), since the old
@@ -95,3 +95,71 @@ protocol trusted the client entirely. Rate limiting, caching, and a texture CDN 
 work items. The batch endpoint `GET /players/{uuid}/cosmetics` (return the full active set
 in one call) should be added so the cosmetic renderer fetches once per visible player
 rather than per cosmetic.
+
+## 5. Endpoints with no recovered ancestor
+
+These have no row above because the original protocol had nothing like them. They are recorded
+here because this document owns the contract, and the shipped client parses them.
+
+| Method and path | Auth | Request body | Response |
+|---|---|---|---|
+| `POST /auth/nonce` | none | - | `{ "server_id": "..." }` |
+| `POST /auth/session` | none | `{ "uuid": "...", "username": "...", "server_id": "..." }` | `{ "token": "...", "token_type": "Bearer", "expires_in": N }` |
+| `POST /players/cosmetics/batch` | none | `{ "uuids": [...] }` | `{ "players": { "<uuid>": { "cosmetics": [...], "cape": "..." } } }` |
+| `GET /ranks` | none | - | `{ "ranks": [{ "name": "...", "color": "#RRGGBB", "staff": bool }] }` |
+| `PUT /players/{uuid}/rank` | admin token | `{ "rank": "..." }` | `204` |
+| `DELETE /chat/{id}` | staff | - | `204` |
+| `GET /chat/mutes` | staff | - | `{ "mutes": [...] }` |
+| `POST /chat/mutes` | staff | `{ "player": "...", "minutes": N, "reason": "..." }` | the stored mute |
+| `DELETE /chat/mutes/{player}` | staff | - | `{ "ok": bool }` |
+
+`GET /players/{uuid}/rank` gained two fields over its recovered shape: it now answers
+`{ "rank": "...", "color": "#RRGGBB", "staff": bool }`. `rank` is unchanged, so a caller written
+against the recovered protocol still reads correctly; `color` exists so the client tags a chat
+line from the same palette the API stamps onto messages rather than keeping its own copy.
+
+**Auth column.** "admin token" means the `X-Admin-Token` header matching
+`CRYOSTASIS_ADMIN_TOKEN`; an unset token disables those routes outright. "staff" means either
+that header or a bearer token whose player holds a rank marked `staff` in the registry.
+
+## 6. Global chat
+
+Delivery is a polled log rather than a stream, because the service runs as several stateless
+replicas with nothing to broadcast through: Postgres `LISTEN/NOTIFY` does not survive
+pgbouncer's transaction pooling, and Redis is a dependency the design deliberately avoids.
+
+Every message carries a monotonic `id`, and a reader asks for what comes after the highest id it
+holds:
+
+```
+GET /chat?after=<id>&limit=<n>&wait=<seconds>
+```
+
+- **No `after`**: the newest `limit` messages, oldest first. This is the backlog a client shows
+  when it starts reading, and the `cursor` in the reply is where it continues from.
+- **With `after`**: everything newer, oldest first.
+- **`wait`**: hold the request open until something arrives, up to the server's ceiling (25s).
+  Only meaningful once the client holds a cursor. An idle reader therefore costs roughly one
+  request per wait window rather than one per poll interval.
+
+The reply is `{ "messages": [...], "cursor": N }`. `cursor` is what to send as `after` next time;
+on an empty first read it is the live end of the log, so a client never re-requests a backlog it
+already knows is empty. A message is:
+
+```json
+{ "id": 12, "uuid": "...", "username": "Ray", "rank": "Chef",
+  "color": "#E8B14C", "message": "...", "at": "2026-08-25T20:48:33Z" }
+```
+
+`username`, `rank` and `color` are a snapshot taken when the line was posted, so rendering it
+needs no further lookups and a later promotion does not rewrite history.
+
+`POST /chat` takes `{ "message": "..." }` and returns the stored message. With auth on, the
+sender is taken entirely from the bearer token and the username the session proof recorded, never
+from the body, so a caller cannot post as someone else. The body's optional `uuid` and `username`
+are honoured only with auth off, where a dev instance has no identity to take. Refusals are:
+`400` too long, `403` muted, `422` empty after cleaning, `429` sending too fast.
+
+Moderation is what the original relay lacked, and why the first design dropped chat rather than
+port it: messages are length-capped and stripped of control characters, every sender has their
+own rate bucket, staff ranks can mute and delete, and the log is swept daily rather than kept.

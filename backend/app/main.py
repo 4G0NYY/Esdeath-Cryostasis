@@ -15,7 +15,7 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 
 from app.api.deps import RateLimiter
-from app.api.v1 import auth, cosmetics, meta, players
+from app.api.v1 import auth, chat, cosmetics, meta, players
 from app.config import Settings, get_settings
 
 
@@ -50,6 +50,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.repo = repo
     app.state.nonces = nonces
     app.state.rate_limiter = RateLimiter(settings.rate_limit_per_minute)
+    app.state.chat_limiter = RateLimiter(settings.chat_rate_per_minute)
     try:
         yield
     finally:
@@ -68,7 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Cryostasis backend", version=settings.version, lifespan=_lifespan)
     app.state.settings = settings
 
-    for router in (meta.router, players.router, cosmetics.router, auth.router):
+    for router in (meta.router, players.router, cosmetics.router, auth.router, chat.router):
         app.include_router(router, prefix="/api")
 
     @app.get("/health")

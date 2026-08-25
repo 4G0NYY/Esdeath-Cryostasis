@@ -11,13 +11,17 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * A top hat: a wide brim and a tall crown, worn on the head. Geometry transcribed from
  * the original 1.8 model (brim 11x2x11, crown 7x4x7).
+ *
+ * The key is "tophat", which is what the backend catalogue and the menu both use. The original
+ * client called it "hat", but the rebuilt catalogue does not, and the key here is what the render
+ * layer matches a player's active set against.
  */
 public final class TopHatCosmetic extends HeadCosmetic {
 	private static final ResourceLocation TEXTURE =
 			ResourceLocation.fromNamespaceAndPath("esdeath-cryostasis", "textures/cosmetic/hat.png");
 
 	public TopHatCosmetic(ModelPart part) {
-		super("hat", part, TEXTURE);
+		super("tophat", part, TEXTURE);
 	}
 
 	public static LayerDefinition createLayer() {

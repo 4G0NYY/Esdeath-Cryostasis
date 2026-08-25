@@ -17,6 +17,7 @@ import moe.ramon.cryostasis.modules.combat.ReachModule;
 import moe.ramon.cryostasis.modules.combat.SharpnessModule;
 import moe.ramon.cryostasis.modules.misc.AutoTextModule;
 import moe.ramon.cryostasis.modules.misc.DiscordPresenceModule;
+import moe.ramon.cryostasis.modules.misc.GlobalChatModule;
 import moe.ramon.cryostasis.modules.misc.TabGuiModule;
 import moe.ramon.cryostasis.modules.misc.TakeAllModule;
 import moe.ramon.cryostasis.modules.movement.AutoPathModule;
@@ -42,6 +43,7 @@ import moe.ramon.cryostasis.modules.render.NightvisionModule;
 import moe.ramon.cryostasis.modules.render.NoBlindModule;
 import moe.ramon.cryostasis.modules.render.XrayModule;
 import moe.ramon.cryostasis.modules.render.ZoomModule;
+import moe.ramon.cryostasis.cosmetics.CosmeticCatalogue;
 import moe.ramon.cryostasis.cosmetics.render.CosmeticLayer;
 import moe.ramon.cryostasis.cosmetics.render.CosmeticModels;
 import moe.ramon.cryostasis.render.WorldRenderHooks;
@@ -78,8 +80,15 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		// renderer so owned cosmetics draw on every visible player.
 		CosmeticModels.registerLayers();
 		registerCosmeticLayer();
+		// The catalogue and its CDN textures come from the backend, so it needs the connection.
+		CosmeticCatalogue.bind(cryostasis.getApiClient());
 
-		ClientTickEvents.END_CLIENT_TICK.register(client -> cryostasis.getModuleManager().onTick());
+		ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			// Ahead of the modules, because the backend enforces auth: a module that writes on
+			// this tick wants the token already in hand.
+			cryostasis.getSessionService().tick();
+			cryostasis.getModuleManager().onTick();
+		});
 
 		HudRenderCallback.EVENT.register((drawContext, tickCounter) ->
 				cryostasis.getHudManager().render(drawContext, tickCounter.getGameTimeDeltaPartialTick(false)));
@@ -160,5 +169,6 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new TakeAllModule());
 		modules.register(new TabGuiModule());
 		modules.register(new DiscordPresenceModule());
+		modules.register(new GlobalChatModule());
 	}
 }

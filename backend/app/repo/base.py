@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from app.domain.models import Player
+from datetime import datetime
+
+from app.domain.models import ChatMessage, Mute, Player
 
 
 @runtime_checkable
@@ -27,6 +29,21 @@ class Repo(Protocol):
         ...
 
     async def set_status(self, uuid: str, status: str) -> None: ...
+
+    async def set_rank(self, uuid: str, rank: str) -> None:
+        """Admin-only rank assignment. The rank string is already validated against the
+        registry by RankBody, so this only stores it."""
+        ...
+
+    async def set_username(self, uuid: str, username: str) -> None:
+        """Record the name Mojang authenticated during the session proof, so global chat
+        renders a name this service verified rather than one a client sent."""
+        ...
+
+    async def find_by_username(self, username: str) -> Player | None:
+        """Look a player up by their recorded name, for moderating by the name a moderator
+        actually sees in chat. None when no one by that name has ever signed in."""
+        ...
 
     async def set_server(self, uuid: str, server: str) -> None:
         """Also marks the player seen, as ImOnServer implied presence."""
@@ -53,6 +70,43 @@ class Repo(Protocol):
         ...
 
     async def capes(self) -> list[str]:
+        ...
+
+    # Global chat. The id is the poll cursor, so post_chat must return the stored message with
+    # its assigned id rather than just writing it.
+    async def post_chat(self, message: ChatMessage) -> ChatMessage:
+        """Append a line and return it with its assigned id. The id on the argument is ignored."""
+        ...
+
+    async def chat_since(self, after_id: int | None, limit: int) -> list[ChatMessage]:
+        """Messages after the given id, oldest first. With no id, the newest `limit` messages,
+        still oldest first, which is the backlog a client shows when it starts reading."""
+        ...
+
+    async def latest_chat_id(self) -> int:
+        """Highest id currently stored, or 0 when empty. The long poll compares against this
+        to decide whether to sleep, without pulling rows it would then discard."""
+        ...
+
+    async def delete_chat(self, message_id: int) -> bool:
+        ...
+
+    async def prune_chat(self, before: datetime) -> None:
+        """Drop messages older than `before`. Global chat is a live channel, not an archive."""
+        ...
+
+    async def set_mute(self, mute: Mute) -> None:
+        ...
+
+    async def clear_mute(self, uuid: str) -> bool:
+        ...
+
+    async def get_mute(self, uuid: str) -> Mute | None:
+        """The player's mute if one is stored, expired or not. Callers check is_active, so an
+        expired row reads the same as none without needing a sweeper to be correct."""
+        ...
+
+    async def active_mutes(self) -> list[Mute]:
         ...
 
     async def close(self) -> None:

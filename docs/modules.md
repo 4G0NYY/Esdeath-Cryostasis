@@ -161,6 +161,7 @@ slot the totem came from, so a shield ends up where the totem was.
 |---|---|---|
 | AutoText | Sends a preset message or command when its bound key is pressed | Key, Message |
 | TabGui | An arrow-key menu in the corner with the same toggles as the click GUI | none |
+| GlobalChat | Chat with everyone running Cryostasis, whatever server you are on | Prefix, Backlog |
 
 For AutoText, bind a key and set the message in the click GUI. A message starting with `/`
 is sent as a command.
@@ -171,19 +172,47 @@ The module column opens to the right of the category column, so the menu grows t
 keys read. It only consumes the arrow keys while it is enabled; every other key still
 reaches your module hotkeys.
 
+GlobalChat is one channel shared by everyone running the client, independent of the server you
+happen to be playing on. Messages arrive in your ordinary chat, tagged `[EC]` and coloured by the
+sender's rank, so there is no extra window to keep open. To send one, start a normal chat line
+with the prefix (`@` by default): `@anyone on hypixel?`. The line is intercepted before it
+reaches the server you are connected to, so a message meant for Cryostasis never leaks into that
+server's chat. Backlog is how many recent messages you see when the module is switched on, and
+zero means start from now.
+
+Sending needs the client to have signed in to the backend, which it does on its own shortly after
+launch. Until then you will be told to try again in a moment. Messages are capped at 256
+characters and rate limited, and staff can mute a player who abuses the channel. If you hold a
+staff rank, `@/mute <player> [minutes] [reason]`, `@/unmute <player>` and `@/mutes` work from the
+same prefix.
+
+## Ranks
+
+Your rank is a tag, not an entitlement: every cosmetic is free for every account regardless of
+it. What it changes is how you appear in global chat, where the tag and your name take the rank's
+colour, and it is shown in the corner of the cosmetics menu. Default, Premium, Epic and Chef are
+display ranks; Mod and Admin also carry the chat moderation commands above. Ranks are granted
+server-side and cannot be set from the client.
+
 ## Cosmetics
 
-Cosmetics are worn by any player the backend says owns them, so you see other players'
-cosmetics too, not just your own. The client fetches each visible player's active
-cosmetics from the backend and caches them.
+Cosmetics are free for every account, so what the backend stores is not who owns what but who
+is currently wearing what. You see other players' cosmetics too, not just your own: the client
+fetches each visible player's active set and caches it.
 
 Currently rebuilt: TopHat, Halo, Bandana. More are planned (Wings, Tail, Rabbit ears,
-Reifen, Susanoo, Rotate, Stripes, and capes).
+Reifen, Susanoo, Rotate, Stripes, and capes). The menu lists everything the backend offers, with
+the ones this client has no model for yet shown greyed out and marked "soon", so a cosmetic added
+server-side appears as soon as it exists rather than waiting for the client update that draws it.
+
+Textures come from the backend's CDN when it has one for a cosmetic, and from the mod's own
+resources otherwise, so the ones that ship with the client work whether or not the CDN is
+reachable.
 
 ### Cosmetics menu
 
 Open it in world with Right Ctrl. It previews your own player, rotating to follow the cursor,
-and lists every cosmetic the client can render. Click a row to toggle that cosmetic on or off:
+and lists the catalogue. Click a row to toggle that cosmetic on or off:
 the preview updates at once and the change is saved to the backend in the background. Because
 the preview reuses the same renderer other players see, what you set here is what they see too.
 The menu needs a world to preview a player, so it only opens once you are in game.

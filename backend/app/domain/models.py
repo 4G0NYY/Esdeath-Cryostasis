@@ -31,6 +31,51 @@ def now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def as_utc(value: datetime) -> datetime:
+    """Attach UTC to a naive timestamp.
+
+    Everything this service stores is written as UTC, but not every driver hands it back that
+    way: sqlite has no timezone-aware storage at all, so a DateTime(timezone=True) column reads
+    back naive. Comparing that against `now()` raises, so timestamps that are compared in Python
+    rather than in SQL pass through here first.
+    """
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+# Ranks. A display tag, not an entitlement: cosmetics stay free for every linked account, so
+# a rank buys colour in chat and, for the two staff tiers, the moderation calls in api/v1/chat.py.
+# The stored value is the display name, which is what the pre-rank rows already hold ("Default"),
+# so adding this registry needed no data migration.
+class Rank(BaseModel):
+    name: str
+    color: str  # hex, handed to the client so the tag colour lives in one place
+    staff: bool = False
+
+
+RANKS: dict[str, Rank] = {
+    r.name.lower(): r
+    for r in [
+        Rank(name="Default", color="#9AA7B8"),
+        Rank(name="Premium", color="#5A8FC7"),
+        Rank(name="Epic", color="#B45AC7"),
+        Rank(name="Chef", color="#E8B14C"),
+        Rank(name="Mod", color="#4CC77A", staff=True),
+        Rank(name="Admin", color="#C75A5A", staff=True),
+    ]
+}
+
+DEFAULT_RANK = RANKS["default"]
+
+
+def resolve_rank(raw: str) -> Rank:
+    """The registry entry for a stored rank string, falling back to Default.
+
+    Case-insensitive because the rank arrives from an admin call typed by hand, and unknown
+    values fall back rather than raise so a row written before a rank was retired still reads.
+    """
+    return RANKS.get(raw.strip().lower(), DEFAULT_RANK)
+
+
 # Catalogue. Cosmetics are free for every linked account (architecture 1), so this is the
 # whole ownership story: membership here is the only "does it exist" check. The client's
 # ModelPart cosmetics key off these slugs (see cosmetics/render/*Cosmetic.java).
@@ -63,9 +108,13 @@ CATALOGUE: dict[str, CosmeticEntry] = {
 
 class Player(BaseModel):
     """All per-player state the protocol exposes. Mirrors Store.Player from the Java dev
-    instance, with last_seen replacing the stored `online` boolean (architecture 6)."""
+    instance, with last_seen replacing the stored `online` boolean (architecture 6).
+
+    username is recorded during the session proof, never taken from a caller's request body, so
+    the name global chat renders is one Mojang authenticated rather than one a client chose."""
 
     uuid: str
+    username: str = ""
     rank: str = "Default"
     status: str = ""
     server: str = ""
@@ -109,3 +158,91 @@ class SessionProofBody(BaseModel):
     uuid: str
     username: str
     server_id: str  # the nonce the client just fed to Mojang's joinServer
+
+
+class RankBody(BaseModel):
+    """Admin-only rank assignment. Validated against the registry here rather than in the
+    router, so an unknown rank can never reach the store."""
+
+    rank: str
+
+    @field_validator("rank")
+    @classmethod
+    def known(cls, v: str) -> str:
+        entry = RANKS.get(v.strip().lower())
+        if entry is None:
+            raise ValueError(f"unknown rank: {v}")
+        # Store the registry's spelling, so case typed by hand does not become the stored value.
+        return entry.name
+
+
+# Global chat. Messages carry the sender's rank and its colour as a snapshot taken at post time:
+# the client then renders a line with no further lookups, and a later promotion does not rewrite
+# what the log says the sender was.
+class ChatMessage(BaseModel):
+    id: int
+    uuid: str
+    username: str
+    rank: str
+    color: str
+    message: str
+    at: datetime
+
+    @field_validator("at")
+    @classmethod
+    def utc(cls, v: datetime) -> datetime:
+        return as_utc(v)
+
+
+class ChatBody(BaseModel):
+    message: str
+
+    # Only honoured with auth off, where there is no token to take an identity from. With auth
+    # on both are ignored in favour of the token subject and the stored username, so a caller
+    # cannot post under someone else's name.
+    uuid: str | None = None
+    username: str | None = None
+
+    @field_validator("message")
+    @classmethod
+    def trimmed(cls, v: str) -> str:
+        # Control characters would let a message forge the section-sign formatting or the line
+        # breaks the client renders, so they are stripped rather than escaped downstream.
+        cleaned = "".join(c for c in v if c.isprintable()).strip()
+        if not cleaned:
+            raise ValueError("message is empty")
+        return cleaned
+
+
+class Mute(BaseModel):
+    uuid: str
+    username: str = ""
+    until: datetime
+    reason: str = ""
+    by: str = ""
+
+    @field_validator("until")
+    @classmethod
+    def utc(cls, v: datetime) -> datetime:
+        return as_utc(v)
+
+    def is_active(self) -> bool:
+        return self.until > now()
+
+
+class MuteBody(BaseModel):
+    """A staff mute. `player` takes a UUID or a username, since a moderator in game reads names
+    off chat lines and never sees a UUID."""
+
+    player: str
+    minutes: int = 10
+    reason: str = ""
+
+    @field_validator("minutes")
+    @classmethod
+    def positive(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("minutes must be at least 1")
+        # A day is the ceiling because chat history is swept daily anyway, and a longer mute is
+        # a ban, which is a decision this service deliberately does not model.
+        return min(v, 24 * 60)

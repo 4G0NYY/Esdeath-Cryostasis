@@ -1,4 +1,4 @@
-"""Version and cape-catalogue endpoints. Both are read-only and unauthenticated."""
+"""Version, catalogue, and rank-registry endpoints. All read-only and unauthenticated."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import get_repo, settings_dep
 from app.config import Settings
-from app.domain.models import CATALOGUE
+from app.domain.models import CATALOGUE, RANKS
 from app.repo.base import Repo
 from app.storage.cdn import texture_url
 
@@ -34,6 +34,18 @@ async def catalogue(settings: Settings = Depends(settings_dep)) -> dict:
                 "texture_url": texture_url(settings.cdn_base_url, entry.texture_key),
             }
             for entry in CATALOGUE.values()
+        ]
+    }
+
+
+@router.get("/ranks")
+async def ranks() -> dict:
+    # The registry, so the client colours a rank tag from the same source the API stamps onto
+    # chat messages instead of hardcoding a palette that can drift from this one.
+    return {
+        "ranks": [
+            {"name": entry.name, "color": entry.color, "staff": entry.staff}
+            for entry in RANKS.values()
         ]
     }
 

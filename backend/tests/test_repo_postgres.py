@@ -68,3 +68,63 @@ async def test_batch(repo):
 async def test_undashed_uuid_keys_same_player(repo):
     await repo.add_cosmetic("aaaaaaaabbbbccccddddeeeeeeeeeeee", "tophat")
     assert (await repo.get_player(UUID)).cosmetics == {"tophat"}
+
+
+async def test_rank_and_username_roundtrip(repo):
+    await repo.set_rank(UUID, "Chef")
+    await repo.set_username(UUID, "Ray")
+    player = await repo.get_player(UUID)
+    assert player.rank == "Chef" and player.username == "Ray"
+
+    # Moderation resolves a name to a player, case-insensitively, since a moderator types the
+    # name as it appears in chat.
+    found = await repo.find_by_username("ray")
+    assert found is not None and found.uuid == UUID
+    assert await repo.find_by_username("someone-else") is None
+
+
+async def test_chat_log_is_an_ordered_cursor(repo):
+    from datetime import timedelta
+
+    from app.domain.models import ChatMessage, now
+
+    def line(text: str) -> ChatMessage:
+        return ChatMessage(
+            id=0, uuid=UUID, username="Ray", rank="Default", color="#9AA7B8", message=text, at=now()
+        )
+
+    first = await repo.post_chat(line("one"))
+    second = await repo.post_chat(line("two"))
+    # The id is assigned by the database and must advance, since it is the poll cursor.
+    assert second.id > first.id
+    assert await repo.latest_chat_id() == second.id
+
+    assert [m.message for m in await repo.chat_since(first.id, 10)] == ["two"]
+    # No cursor: the tail of the log, still oldest first.
+    assert [m.message for m in await repo.chat_since(None, 10)] == ["one", "two"]
+
+    assert await repo.delete_chat(first.id) is True
+    assert await repo.delete_chat(first.id) is False
+
+    await repo.prune_chat(now() + timedelta(hours=1))
+    assert await repo.chat_since(None, 10) == []
+
+
+async def test_mute_lapses_without_a_sweeper(repo):
+    from datetime import timedelta
+
+    from app.domain.models import Mute, now
+
+    await repo.set_mute(Mute(uuid=UUID, username="Ray", until=now() + timedelta(minutes=5)))
+    stored = await repo.get_mute(UUID)
+    assert stored is not None and stored.is_active()
+    assert [m.uuid for m in await repo.active_mutes()] == [UUID]
+
+    # An expired row stays behind but reads as inactive, which is why no sweeper is needed.
+    await repo.set_mute(Mute(uuid=UUID, username="Ray", until=now() - timedelta(minutes=1)))
+    lapsed = await repo.get_mute(UUID)
+    assert lapsed is not None and not lapsed.is_active()
+    assert await repo.active_mutes() == []
+
+    assert await repo.clear_mute(UUID) is True
+    assert await repo.get_mute(UUID) is None

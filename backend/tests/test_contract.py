@@ -90,7 +90,11 @@ async def test_status_roundtrip(client, uuid):
 
 
 async def test_rank_default(client, uuid):
-    assert (await client.get(f"/api/players/{uuid}/rank")).json() == {"rank": "Default"}
+    # `rank` is the contract field the recovered getRankofPlayer returned and the one the
+    # shipped client would parse; color and staff are additive, for the chat tag.
+    body = (await client.get(f"/api/players/{uuid}/rank")).json()
+    assert body["rank"] == "Default"
+    assert body["color"] == "#9AA7B8" and body["staff"] is False
 
 
 async def test_presence_online_and_by_server(client, uuid):

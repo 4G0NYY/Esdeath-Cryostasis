@@ -7,14 +7,14 @@ falls offline on its own.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db.models import CapeRow, PlayerCosmeticRow, PlayerRow
-from app.domain.models import Player, normalize_uuid, now
+from app.db.models import CapeRow, ChatMessageRow, ChatMuteRow, PlayerCosmeticRow, PlayerRow
+from app.domain.models import ChatMessage, Mute, Player, normalize_uuid, now
 
 
 class PostgresRepo:
@@ -34,6 +34,7 @@ class PostgresRepo:
     def _to_domain(row: PlayerRow, cosmetics: set[str]) -> Player:
         return Player(
             uuid=row.uuid,
+            username=row.username,
             rank=row.rank,
             status=row.status,
             server=row.server,
@@ -83,6 +84,28 @@ class PostgresRepo:
         async with self._sessionmaker() as session:
             (await self._row(session, uuid)).status = status
             await session.commit()
+
+    async def set_rank(self, uuid: str, rank: str) -> None:
+        async with self._sessionmaker() as session:
+            (await self._row(session, uuid)).rank = rank
+            await session.commit()
+
+    async def set_username(self, uuid: str, username: str) -> None:
+        async with self._sessionmaker() as session:
+            (await self._row(session, uuid)).username = username
+            await session.commit()
+
+    async def find_by_username(self, username: str) -> Player | None:
+        async with self._sessionmaker() as session:
+            row = (
+                await session.execute(
+                    select(PlayerRow).where(func.lower(PlayerRow.username) == username.strip().lower())
+                )
+            ).scalars().first()
+            if row is None:
+                return None
+            slugs = (await self._slugs_for(session, [row.uuid]))[row.uuid]
+            return self._to_domain(row, slugs)
 
     async def set_server(self, uuid: str, server: str) -> None:
         async with self._sessionmaker() as session:
@@ -151,6 +174,113 @@ class PostgresRepo:
         async with self._sessionmaker() as session:
             rows = await session.execute(select(CapeRow.name))
             return list(rows.scalars().all())
+
+    @staticmethod
+    def _chat_to_domain(row: ChatMessageRow) -> ChatMessage:
+        return ChatMessage(
+            id=row.id,
+            uuid=row.player_uuid,
+            username=row.username,
+            rank=row.rank,
+            color=row.color,
+            message=row.message,
+            at=row.created_at,
+        )
+
+    async def post_chat(self, message: ChatMessage) -> ChatMessage:
+        async with self._sessionmaker() as session:
+            row = ChatMessageRow(
+                player_uuid=normalize_uuid(message.uuid),
+                username=message.username,
+                rank=message.rank,
+                color=message.color,
+                message=message.message,
+                created_at=message.at,
+            )
+            session.add(row)
+            await session.commit()
+            # The id is assigned by the database, and it is the cursor clients poll on, so it
+            # has to be read back rather than guessed.
+            await session.refresh(row)
+            return self._chat_to_domain(row)
+
+    async def chat_since(self, after_id: int | None, limit: int) -> list[ChatMessage]:
+        async with self._sessionmaker() as session:
+            if after_id is None:
+                # No cursor: the newest `limit` rows, then reversed, so a starting client gets
+                # its backlog in reading order without scanning the whole table.
+                rows = await session.execute(
+                    select(ChatMessageRow).order_by(ChatMessageRow.id.desc()).limit(limit)
+                )
+                return [self._chat_to_domain(r) for r in reversed(rows.scalars().all())]
+            rows = await session.execute(
+                select(ChatMessageRow)
+                .where(ChatMessageRow.id > after_id)
+                .order_by(ChatMessageRow.id)
+                .limit(limit)
+            )
+            return [self._chat_to_domain(r) for r in rows.scalars().all()]
+
+    async def latest_chat_id(self) -> int:
+        async with self._sessionmaker() as session:
+            newest = (await session.execute(select(func.max(ChatMessageRow.id)))).scalar()
+            return newest or 0
+
+    async def delete_chat(self, message_id: int) -> bool:
+        async with self._sessionmaker() as session:
+            result = await session.execute(
+                delete(ChatMessageRow).where(ChatMessageRow.id == message_id)
+            )
+            await session.commit()
+            return (result.rowcount or 0) > 0
+
+    async def prune_chat(self, before: datetime) -> None:
+        async with self._sessionmaker() as session:
+            await session.execute(
+                delete(ChatMessageRow).where(ChatMessageRow.created_at < before)
+            )
+            await session.commit()
+
+    async def set_mute(self, mute: Mute) -> None:
+        key = normalize_uuid(mute.uuid)
+        async with self._sessionmaker() as session:
+            row = await session.get(ChatMuteRow, key)
+            if row is None:
+                row = ChatMuteRow(player_uuid=key)
+                session.add(row)
+            row.username = mute.username
+            row.until = mute.until
+            row.reason = mute.reason
+            row.by_uuid = mute.by
+            await session.commit()
+
+    async def clear_mute(self, uuid: str) -> bool:
+        async with self._sessionmaker() as session:
+            result = await session.execute(
+                delete(ChatMuteRow).where(ChatMuteRow.player_uuid == normalize_uuid(uuid))
+            )
+            await session.commit()
+            return (result.rowcount or 0) > 0
+
+    @staticmethod
+    def _mute_to_domain(row: ChatMuteRow) -> Mute:
+        return Mute(
+            uuid=row.player_uuid,
+            username=row.username,
+            until=row.until,
+            reason=row.reason,
+            by=row.by_uuid,
+        )
+
+    async def get_mute(self, uuid: str) -> Mute | None:
+        async with self._sessionmaker() as session:
+            row = await session.get(ChatMuteRow, normalize_uuid(uuid))
+            return self._mute_to_domain(row) if row is not None else None
+
+    async def active_mutes(self) -> list[Mute]:
+        async with self._sessionmaker() as session:
+            rows = await session.execute(select(ChatMuteRow).where(ChatMuteRow.until > now()))
+            return [self._mute_to_domain(r) for r in rows.scalars().all()]
 
     async def close(self) -> None:
         return None

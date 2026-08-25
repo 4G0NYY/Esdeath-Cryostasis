@@ -9,6 +9,7 @@
 		"client.BlockMixin",
 		"client.CameraMixin",
 		"client.ChatComponentMixin",
+		"client.ChatScreenMixin",
 		"client.EntityMixin",
 		"client.FogRendererMixin",
 		"client.GameRendererMixin",

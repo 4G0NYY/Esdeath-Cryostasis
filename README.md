@@ -23,7 +23,7 @@ No Minecraft code lives in this repository. The build ships as a Fabric mod jar 
 - Phase 1 (mod skeleton and framework): done. Module manager, settings, versioned JSON
   config, keybind and input layer, internal event bus, click GUI, and a HUD engine with
   anchored, draggable elements.
-- Phase 2 (modules): done, and past the original spec. Forty-one modules across six
+- Phase 2 (modules): done, and past the original spec. Forty-two modules across six
   categories.
   - HUD: FPS, CPS, XYZ, ReachDisplay, PingTag, Plains, MLGHelper, ArrayList, Rainbow.
   - Movement: ToggleSprint, SafeWalk, AutoPath, Zoot, Spider, Jesus, NoCobweb, NoSoulsand,
@@ -32,16 +32,17 @@ No Minecraft code lives in this repository. The build ships as a Fabric mod jar 
     Freelook.
   - Combat: MoreParticles, Sharpness, Killaura, AutoDodge, Reach.
   - Player: AutoTool, AutoEquip, AutoTotem, FastBreak, NoHunger.
-  - Misc: AutoText, TakeAll, TabGui, DiscordPresence.
+  - Misc: AutoText, TakeAll, TabGui, DiscordPresence, GlobalChat.
 
   Still deferred, for want of the backend or of anything left to recover from the
   decompilation: Connector, MotionBlur, ItemAnimation.
-- Phase 3 (cosmetics backend): done. A local dev instance in `backend/` implements the
-  full REST contract and is smoke-tested end to end.
+- Phase 3 (cosmetics backend): done, and hosted. `backend/` implements the full REST
+  contract and runs at `cryostasis.ramon.moe` behind the session-proof handshake. Beyond
+  cosmetics and presence it now serves ranks and a Cryostasis-wide global chat.
 - Phase 4 (cosmetics rendering): framework done. The backend-driven cosmetic layer is
-  wired onto the player renderer, with the TopHat, Halo, and Bandana models rebuilt.
-  Visual correctness still needs a live client pass; the remaining cosmetics and the
-  in-game cosmetics menu are pending.
+  wired onto the player renderer, with the TopHat, Halo, and Bandana models rebuilt, and
+  the in-game menu reads the catalogue from the backend. Visual correctness still needs a
+  live client pass, and the remaining cosmetics are pending.
 
 The parts that need a running client to verify (visual rendering, in-world modules) are
 marked as such in `Todo.md`. See it for the full roadmap and per-item progress.
@@ -135,9 +136,11 @@ settings, and drag panel headers to rearrange.
     behavior rather than sit alongside it does its work.
   - `modules/` concrete modules.
   - `cosmetics/` the backend-driven cosmetic layer and its models.
+  - `backend/` the client side of the API: the shared connection, the session handshake
+    that authenticates it, and global chat.
 - `launcher/` the desktop launcher (Go and Wails): installs Fabric, the mod jar, and the
   launch profile, and picks the cosmetics backend.
-- `backend/` a local dev instance of the cosmetics REST API.
+- `backend/` the REST API: cosmetics, presence, ranks, and global chat.
 - `installer/` the Windows setup installer (Go, no dependencies): installs the launcher as a
   desktop app with Add/Remove Programs support, and uninstalls it.
 - `docs/` recovered specification and backend API design.

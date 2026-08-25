@@ -26,6 +26,9 @@ services:
       # The +asyncpg driver is added by the app; a plain postgresql:// URL is correct.
       - CRYOSTASIS_DATABASE_URL
       - CRYOSTASIS_JWT_SECRET
+      # Guards rank assignment. Without it that route is closed to everyone, which is the safe
+      # default but also means nobody can grant a rank until it is set.
+      - CRYOSTASIS_ADMIN_TOKEN
     networks:
       # The overlay your pgbouncer is reachable on. Fronting this with your own reverse proxy on
       # the same network is preferred over publishing a port, since the app expects TLS to be
@@ -77,7 +80,10 @@ secrets:
   # Create these before deploying, for example:
   #   printf 'postgresql://cryostasis:<pw>@pgbouncer:6432/cryostasis' | docker secret create CRYOSTASIS_DATABASE_URL -
   #   openssl rand -hex 32 | docker secret create CRYOSTASIS_JWT_SECRET -
+#   openssl rand -hex 32 | docker secret create CRYOSTASIS_ADMIN_TOKEN -
   CRYOSTASIS_DATABASE_URL:
     external: true
   CRYOSTASIS_JWT_SECRET:
+    external: true
+  CRYOSTASIS_ADMIN_TOKEN:
     external: true

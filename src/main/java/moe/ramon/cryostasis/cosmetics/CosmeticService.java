@@ -2,16 +2,15 @@ package moe.ramon.cryostasis.cosmetics;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import moe.ramon.cryostasis.backend.ApiClient;
+import moe.ramon.cryostasis.backend.SessionService;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -20,9 +19,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * is missing or stale, kicks off a non-blocking refresh so the render thread never waits
  * on the network.
  *
- * The base URL defaults to the local dev instance and can be overridden with the
- * {@code cryostasis.api} system property, so pointing the client at a live server or a
- * different dev port needs no recompile.
+ * Reads are open, but every write carries the bearer token from the session handshake, which the
+ * shared {@link ApiClient} attaches. The hosted backend enforces that a caller may only change
+ * its own UUID, so without a token a toggle would simply come back 401 and silently do nothing.
  */
 public final class CosmeticService {
 	/** A player's currently active cosmetics as reported by the backend. */
@@ -36,10 +35,8 @@ public final class CosmeticService {
 
 	private static final long TTL_MS = 30_000;
 
-	private final HttpClient http = HttpClient.newBuilder()
-			.connectTimeout(Duration.ofSeconds(5))
-			.build();
-	private final String baseUrl;
+	private final ApiClient api;
+	private final SessionService session;
 	private final ConcurrentHashMap<UUID, Entry> cache = new ConcurrentHashMap<>();
 
 	private static final class Entry {
@@ -48,17 +45,13 @@ public final class CosmeticService {
 		volatile boolean loading;
 	}
 
-	public CosmeticService() {
-		this(System.getProperty("cryostasis.api", "http://localhost:8080/api"));
-	}
-
-	public CosmeticService(String baseUrl) {
-		// Trim a trailing slash so path concatenation stays clean.
-		this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+	public CosmeticService(ApiClient api, SessionService session) {
+		this.api = api;
+		this.session = session;
 	}
 
 	public String baseUrl() {
-		return baseUrl;
+		return api.baseUrl();
 	}
 
 	/**
@@ -90,31 +83,26 @@ public final class CosmeticService {
 	 */
 	public void activate(UUID player, String cosmetic) {
 		setLocalActive(player, cosmetic, true);
-		String key = cosmetic.toLowerCase();
-		HttpRequest request = HttpRequest.newBuilder()
-				.uri(URI.create(baseUrl + "/players/" + player + "/cosmetics"))
-				.timeout(Duration.ofSeconds(5))
-				.header("Content-Type", "application/json")
-				.POST(HttpRequest.BodyPublishers.ofString("{\"cosmetic\":\"" + key + "\"}"))
-				.build();
-		send(player, request);
+		JsonObject body = new JsonObject();
+		body.addProperty("cosmetic", cosmetic.toLowerCase());
+		track(player, api.post("/players/" + player + "/cosmetics", body));
 	}
 
 	/** Deactivate a cosmetic for a player. Optimistic and non-blocking, mirroring {@link #activate}. */
 	public void deactivate(UUID player, String cosmetic) {
 		setLocalActive(player, cosmetic, false);
-		String key = cosmetic.toLowerCase();
-		HttpRequest request = HttpRequest.newBuilder()
-				.uri(URI.create(baseUrl + "/players/" + player + "/cosmetics/" + key))
-				.timeout(Duration.ofSeconds(5))
-				.DELETE()
-				.build();
-		send(player, request);
+		track(player, api.delete("/players/" + player + "/cosmetics/" + cosmetic.toLowerCase()));
 	}
 
-	private void send(UUID player, HttpRequest request) {
-		http.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-				.whenComplete((ok, error) -> invalidate(player));
+	private void track(UUID player, CompletableFuture<HttpResponse<String>> pending) {
+		pending.whenComplete((response, error) -> {
+			// A lapsed token is the one failure worth acting on: mark the session stale so the
+			// next tick re-runs the handshake, rather than letting every later write 401 too.
+			if (response != null && response.statusCode() == 401) {
+				session.invalidate();
+			}
+			invalidate(player);
+		});
 	}
 
 	/**
@@ -136,12 +124,7 @@ public final class CosmeticService {
 
 	private void refresh(UUID player, Entry entry) {
 		entry.loading = true;
-		HttpRequest request = HttpRequest.newBuilder()
-				.uri(URI.create(baseUrl + "/players/" + player + "/cosmetics"))
-				.timeout(Duration.ofSeconds(5))
-				.GET()
-				.build();
-		http.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+		api.get("/players/" + player + "/cosmetics")
 				.thenAccept(response -> {
 					if (response.statusCode() == 200) {
 						entry.data = parse(response.body());

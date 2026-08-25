@@ -59,6 +59,31 @@ class Settings(BaseSettings):
 
     cosmetics_cache_seconds: int = 30
 
+    # Grants the admin surface, which today is only "set a player's rank". Empty disables that
+    # surface outright rather than falling back to some weaker check, so a deployment that
+    # forgot to set it cannot have its ranks rewritten by anyone.
+    admin_token: str = ""
+
+    # Global chat. The message cap is generous enough for a sentence and small enough that a
+    # single line cannot push the rest of a player's chat off screen.
+    chat_max_length: int = 256
+
+    # Its own bucket, separate from rate_limit_per_minute: posting a chat line is the one
+    # write a player repeats deliberately, and it wants a much tighter limit than a cosmetic
+    # toggle does.
+    chat_rate_per_minute: int = 12
+
+    chat_history_limit: int = 100
+
+    # Long-poll ceiling. A reader asks to be held open for up to this long, which keeps an idle
+    # client to roughly one request per this many seconds instead of one per poll interval.
+    chat_poll_max_wait_seconds: float = 25.0
+    chat_poll_interval_seconds: float = 1.0
+
+    # Messages older than this are swept when a new one is posted. Global chat is a live
+    # channel, not an archive, so nothing needs to keep yesterday's lines.
+    chat_retention_hours: int = 24
+
 
 @lru_cache
 def get_settings() -> Settings:

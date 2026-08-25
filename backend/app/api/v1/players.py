@@ -1,16 +1,25 @@
 """Player state and presence: status, rank, server, cape, and the online lists.
 
 Reads are open (any caller may look up any player, as the renderer must). Writes go through
-require_caller, so with auth on only the owning account can change its own record.
+require_caller, so with auth on only the owning account can change its own record. Rank is the
+one exception in both directions: it is granted rather than chosen, so it takes the admin token
+and is the only write a player cannot make to their own row.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response
 
-from app.api.deps import get_repo, require_caller, settings_dep
+from app.api.deps import get_repo, require_admin, require_caller, settings_dep
 from app.config import Settings
-from app.domain.models import CapeBody, ServerBody, StatusBody, normalize_uuid
+from app.domain.models import (
+    CapeBody,
+    RankBody,
+    ServerBody,
+    StatusBody,
+    normalize_uuid,
+    resolve_rank,
+)
 from app.repo.base import Repo
 
 router = APIRouter()
@@ -66,7 +75,19 @@ async def get_status(uuid: str, repo: Repo = Depends(get_repo)) -> dict:
 
 @router.get("/players/{uuid}/rank")
 async def get_rank(uuid: str, repo: Repo = Depends(get_repo)) -> dict:
-    return {"rank": (await repo.get_player(normalize_uuid(uuid))).rank}
+    # rank is the contract field the recovered getRankofPlayer returned; color and staff are
+    # additive, so the shipped client keeps parsing this while the rebuilt one can colour a
+    # chat tag without carrying its own copy of the registry.
+    entry = resolve_rank((await repo.get_player(normalize_uuid(uuid))).rank)
+    return {"rank": entry.name, "color": entry.color, "staff": entry.staff}
+
+
+@router.put("/players/{uuid}/rank", status_code=204, dependencies=[Depends(require_admin)])
+async def set_rank(uuid: str, body: RankBody, repo: Repo = Depends(get_repo)) -> Response:
+    # Admin token rather than require_caller: a rank is granted to a player, so the one caller
+    # who must not be able to set it is the player themselves.
+    await repo.set_rank(normalize_uuid(uuid), body.rank)
+    return Response(status_code=204)
 
 
 @router.put("/players/{uuid}/cape", status_code=204)

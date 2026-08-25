@@ -1,20 +1,22 @@
 """Session-proof auth (architecture 4).
 
 Two endpoints: request a nonce, then prove ownership through the Mojang handshake and
-receive a short-lived JWT. This is the only security-relevant surface in the service, since
-cosmetics are free; without it anyone could set anyone else's status or appearance.
+receive a short-lived JWT. This is the security-relevant surface the rest of the service rests
+on: cosmetics are free, so without it anyone could set anyone else's status or appearance, and
+global chat would be back to the original relay's anyone-can-be-anyone model.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import get_nonces, settings_dep
+from app.api.deps import get_nonces, get_repo, settings_dep
 from app.auth import session as session_proof
 from app.auth import tokens
 from app.auth.session import NonceStore
 from app.config import Settings
 from app.domain.models import SessionProofBody, normalize_uuid
+from app.repo.base import Repo
 
 router = APIRouter()
 
@@ -30,6 +32,7 @@ async def prove_session(
     body: SessionProofBody,
     nonces: NonceStore = Depends(get_nonces),
     settings: Settings = Depends(settings_dep),
+    repo: Repo = Depends(get_repo),
 ) -> dict:
     if not await nonces.consume(body.server_id):
         raise HTTPException(status_code=400, detail="unknown or expired nonce")
@@ -47,6 +50,11 @@ async def prove_session(
     # The account Mojang authenticated must be the one the caller claims to be acting as.
     if mojang_uuid != normalize_uuid(body.uuid):
         raise HTTPException(status_code=401, detail="session does not match claimed uuid")
+
+    # The handshake is the only moment this service learns a name from a source it trusts, so
+    # it is where the name global chat renders gets recorded. Taking it from a request body
+    # instead would let anyone post under any name.
+    await repo.set_username(mojang_uuid, body.username)
 
     token = tokens.issue(
         mojang_uuid,
