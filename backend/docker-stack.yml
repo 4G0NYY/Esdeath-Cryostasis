@@ -20,6 +20,10 @@ services:
       CRYOSTASIS_REQUIRE_AUTH: "true"
       CRYOSTASIS_CDN_BASE_URL: "https://cdn.cryostasis.ramon.moe"
       CRYOSTASIS_PRESENCE_WINDOW_SECONDS: "120"
+      # How long a connected player may do nothing before they read as away. Much larger than the
+      # window above on purpose: that one asks whether the client is still there, this one asks
+      # whether the player is.
+      CRYOSTASIS_AFK_AFTER_SECONDS: "300"
     secrets:
       # CRYOSTASIS_DATABASE_URL must point at pgbouncer, e.g.
       #   postgresql://cryostasis:<pw>@pgbouncer:6432/cryostasis
