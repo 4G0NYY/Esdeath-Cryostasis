@@ -1,9 +1,10 @@
 package moe.ramon.cryostasis.util;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
-import net.minecraft.tags.ItemTags;
+import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
@@ -22,11 +23,6 @@ import net.minecraft.world.level.block.state.BlockState;
  * rather than testing instanceof on classes that no longer exist.
  */
 public final class InventoryUtil {
-	private static final double BARE_HAND_DAMAGE = 1.0;
-
-	/** Larger than any weapon's damage, so it sorts swords into a tier of their own. */
-	private static final double SWORD_PREFERENCE = 1000.0;
-
 	private InventoryUtil() {
 	}
 
@@ -77,29 +73,33 @@ public final class InventoryUtil {
 	}
 
 	/**
-	 * Hotbar slot of the best melee weapon, or -1 when nothing beats a bare fist.
+	 * Hotbar slot of the best melee weapon, or -1 when nothing in the hotbar beats a bare fist.
 	 *
-	 * A sword outranks anything else in the hotbar even where an axe hits harder on paper.
-	 * Attack damage is only half of an exchange: a sword recovers to full strength in roughly
-	 * half the time an axe takes and sweeps everything standing beside the target, so across any
-	 * fight longer than a single hit the sword does more. Damage still decides between two swords,
-	 * and between whatever is left when the hotbar holds no sword at all.
+	 * Weapons are ranked by what they land over time rather than by the damage on the tooltip. An
+	 * axe hits harder per swing but recovers at roughly half a sword's rate, so a sword beats the
+	 * axe of its own material, gold aside. An axe far enough ahead in material still wins outright:
+	 * a netherite axe beats a stone sword, and an iron sword beats a diamond axe.
+	 *
+	 * The player's own base damage and swing rate are read off the player rather than written down
+	 * here, so a server that has changed either still gets a ranking that matches what its players
+	 * feel. Base rather than current, because the current value already carries the modifiers of
+	 * whatever is held right now and would count that item twice.
 	 */
 	public static int bestWeaponSlot(Minecraft mc) {
 		Inventory inv = mc.player.getInventory();
+		double baseDamage = mc.player.getAttributeBaseValue(Attributes.ATTACK_DAMAGE);
+		double baseSpeed = mc.player.getAttributeBaseValue(Attributes.ATTACK_SPEED);
+
 		int best = -1;
-		double bestScore = 0.0;
+		double bestScore = baseDamage * baseSpeed;
 		for (int i = 0; i < 9; i++) {
 			ItemStack s = inv.getItem(i);
 			if (s.isEmpty()) {
 				continue;
 			}
-			double dmg = attackDamage(s);
-			if (dmg <= BARE_HAND_DAMAGE) {
-				// No harder than punching, so not worth a swap.
-				continue;
-			}
-			double score = dmg + (s.is(ItemTags.SWORDS) ? SWORD_PREFERENCE : 0.0);
+			double damage = baseDamage + attackDamage(s);
+			double speed = Math.max(0.0, baseSpeed + attackSpeed(s));
+			double score = damage * speed;
 			if (score > bestScore) {
 				bestScore = score;
 				best = i;
@@ -122,17 +122,29 @@ public final class InventoryUtil {
 
 	/** Sum of the item's attack-damage attribute modifiers; 0 for anything without them. */
 	public static double attackDamage(ItemStack s) {
+		return modifierSum(s, Attributes.ATTACK_DAMAGE);
+	}
+
+	/**
+	 * Sum of the item's attack-speed attribute modifiers, which are negative for every weapon: a
+	 * weapon takes swings away from the player's base rate rather than granting its own.
+	 */
+	public static double attackSpeed(ItemStack s) {
+		return modifierSum(s, Attributes.ATTACK_SPEED);
+	}
+
+	private static double modifierSum(ItemStack s, Holder<Attribute> attribute) {
 		ItemAttributeModifiers mods = s.get(DataComponents.ATTRIBUTE_MODIFIERS);
 		if (mods == null) {
 			return 0.0;
 		}
-		double dmg = 0.0;
+		double total = 0.0;
 		for (ItemAttributeModifiers.Entry e : mods.modifiers()) {
-			if (e.attribute().value() == Attributes.ATTACK_DAMAGE.value()) {
-				dmg += e.modifier().amount();
+			if (e.attribute().value() == attribute.value()) {
+				total += e.modifier().amount();
 			}
 		}
-		return dmg;
+		return total;
 	}
 
 	/**

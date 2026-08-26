@@ -177,11 +177,13 @@ crit.
 | FastBreak | Mines and breaks blocks faster | Multiplier |
 | NoHunger | Keeps the hunger bar from draining | none |
 
-AutoTool picks a weapon by more than the damage number on the tooltip. A sword is taken over
-anything else in the hotbar even where an axe hits harder on paper, because an axe recovers to
-full strength at roughly half a sword's rate and sweeps nothing beside the target, so over a
-fight the sword lands more. Damage decides between two swords, and between whatever else is
-there when the hotbar holds no sword.
+AutoTool ranks weapons by what they land over time rather than by the damage on the tooltip. An
+axe hits harder per swing but recovers at roughly half a sword's rate, so a sword beats the axe of
+its own material, gold aside. An axe far enough ahead in material still wins outright: a netherite
+axe beats a stone sword, and an iron sword beats a diamond axe. Nothing is swapped to at all
+unless it beats a bare fist, which is why a mace is left alone: its swing rate puts it below
+punching for repeated hits, and the falling smash it is actually carried for is not something a
+swap on attack can see coming.
 
 NoHunger drops the exhaustion that food and saturation are spent on, so the bar holds where
 it is. It never adds anything back: a bar already empty stays empty until you eat. Hunger is
