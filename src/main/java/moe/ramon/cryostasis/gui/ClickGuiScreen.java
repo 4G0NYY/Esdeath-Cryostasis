@@ -35,6 +35,8 @@ import java.util.Set;
  */
 public final class ClickGuiScreen extends Screen {
 	private static final int PANEL_WIDTH = 112;
+	private static final int PANEL_GAP = 4;
+	private static final int MARGIN = 6;
 	private static final int ROW_HEIGHT = 13;
 	private static final int SLIDER_HEIGHT = 21;
 	private static final int HEADER_HEIGHT = 14;
@@ -81,14 +83,35 @@ public final class ClickGuiScreen extends Screen {
 
 	public ClickGuiScreen() {
 		super(Component.literal("Cryostasis"));
-		if (!initialized) {
-			int x = 6;
-			for (Category category : Category.values()) {
-				PANELS.add(new Panel(category, x, 6));
-				x += PANEL_WIDTH + 4;
-			}
-			initialized = true;
+	}
+
+	@Override
+	protected void init() {
+		if (initialized) {
+			return;
 		}
+		// Laid out here rather than in the constructor because it needs the screen size, which a
+		// constructor does not have. Six panels in one row is over 690 units wide, and at a high
+		// GUI scale the usable width is as little as 320, so a single row would start most
+		// categories off screen with no way to know they were there. They are draggable after
+		// this; the wrap only decides where they begin.
+		int x = MARGIN;
+		int y = MARGIN;
+		int rowHeight = 0;
+		for (Category category : Category.values()) {
+			if (x > MARGIN && x + PANEL_WIDTH > width) {
+				x = MARGIN;
+				y += rowHeight + MARGIN;
+				rowHeight = 0;
+			}
+			PANELS.add(new Panel(category, x, y));
+			x += PANEL_WIDTH + PANEL_GAP;
+			// The collapsed height, since a panel starts with its modules listed and its settings
+			// folded away.
+			int modules = Cryostasis.get().getModuleManager().getByCategory(category).size();
+			rowHeight = Math.max(rowHeight, HEADER_HEIGHT + modules * ROW_HEIGHT);
+		}
+		initialized = true;
 	}
 
 	@Override

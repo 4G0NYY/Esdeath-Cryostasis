@@ -34,11 +34,20 @@ import java.util.UUID;
  * status line is as much a part of that as a hat is.
  */
 public final class CosmeticsScreen extends Screen {
-	private static final int PANEL_WIDTH = 400;
+	/**
+	 * The panel's preferred width. It shrinks to fit rather than overflowing: the game's UI is
+	 * never narrower than 320 units, but it is often exactly that, since auto GUI scale picks the
+	 * largest scale that still leaves 320 by 240. A fixed 400 would hang off the side of the
+	 * screen for anyone at a high scale.
+	 */
+	private static final int PANEL_WIDTH_MAX = 400;
+	/** Below this there is no room for the preview, and the two lists get the space instead. */
+	private static final int PREVIEW_THRESHOLD = 360;
 	private static final int PANEL_HEIGHT = 200;
 	private static final int ROW_HEIGHT = 16;
 	private static final int PREVIEW_WIDTH = 110;
-	private static final int LIST_WIDTH = 130;
+	private static final int GUTTER = 12;
+	private static final int MARGIN = 6;
 	private static final int HEADER_HEIGHT = 15;
 	private static final int STATUS_HEIGHT = 14;
 	/** The backend caps a status at this, so the field refuses the rest rather than losing it. */
@@ -63,8 +72,12 @@ public final class CosmeticsScreen extends Screen {
 
 	@Override
 	protected void init() {
-		PresenceService presence = Cryostasis.get().getPresenceService();
-		String current = presence.self().status();
+		// A resize rebuilds every widget, so the field's value is carried over rather than
+		// re-read: a player who has typed a status and then resized the window should not have
+		// to type it again.
+		String current = status != null
+				? status.getValue()
+				: Cryostasis.get().getPresenceService().self().status();
 
 		status = new EditBox(font, presenceX() + 1, contentY() + 18, presenceWidth() - 2,
 				STATUS_HEIGHT, Component.literal("Status"));
@@ -85,11 +98,11 @@ public final class CosmeticsScreen extends Screen {
 
 		int panelX = panelX();
 		int panelY = panelY();
-		Skin.plate(context, panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, Theme.PANEL_SOLID, Theme.ACCENT_DIM);
+		Skin.plate(context, panelX, panelY, panelWidth(), PANEL_HEIGHT, Theme.PANEL_SOLID, Theme.ACCENT_DIM);
 
 		// Header with the accent seam the rest of the client uses.
-		context.fill(panelX, panelY, panelX + PANEL_WIDTH, panelY + HEADER_HEIGHT, Theme.HEADER);
-		context.fill(panelX, panelY + HEADER_HEIGHT - 1, panelX + PANEL_WIDTH, panelY + HEADER_HEIGHT, Theme.ACCENT);
+		context.fill(panelX, panelY, panelX + panelWidth(), panelY + HEADER_HEIGHT, Theme.HEADER);
+		context.fill(panelX, panelY + HEADER_HEIGHT - 1, panelX + panelWidth(), panelY + HEADER_HEIGHT, Theme.ACCENT);
 		context.drawString(font, "Cosmetics", panelX + 6, panelY + 4, Theme.TEXT);
 		renderRank(context, panelX, panelY);
 
@@ -105,14 +118,17 @@ public final class CosmeticsScreen extends Screen {
 		SessionService session = Cryostasis.get().getSessionService();
 		String label = session.isAuthenticated() ? session.rank() : "Connecting";
 		int color = session.isAuthenticated() ? session.rankColor() : Theme.SUBTEXT;
-		context.drawString(font, label, panelX + PANEL_WIDTH - font.width(label) - 6, panelY + 4, color);
+		context.drawString(font, label, panelX + panelWidth() - font.width(label) - 6, panelY + 4, color);
 	}
 
 	private void renderPreview(GuiGraphics context, int mouseX, int mouseY) {
-		int px0 = panelX() + 6;
+		if (!hasPreview()) {
+			return;
+		}
+		int px0 = panelX() + MARGIN;
 		int py0 = contentY() + 6;
 		int px1 = px0 + PREVIEW_WIDTH;
-		int py1 = panelY() + PANEL_HEIGHT - 6;
+		int py1 = panelY() + PANEL_HEIGHT - MARGIN;
 		Skin.plate(context, px0, py0, PREVIEW_WIDTH, py1 - py0, Theme.CELL, Theme.CELL_BORDER);
 
 		LocalPlayer player = minecraft != null ? minecraft.player : null;
@@ -128,7 +144,7 @@ public final class CosmeticsScreen extends Screen {
 
 	private void renderRows(GuiGraphics context, int mouseX, int mouseY) {
 		int listX = listX();
-		int listRight = listX + LIST_WIDTH;
+		int listRight = listX + listWidth();
 		int rowY = contentY() + 8;
 
 		UUID uuid = localUuid();
@@ -244,7 +260,7 @@ public final class CosmeticsScreen extends Screen {
 			return super.mouseClicked(mouseX, mouseY, button);
 		}
 		int listX = listX();
-		int listRight = listX + LIST_WIDTH;
+		int listRight = listX + listWidth();
 		int rowY = contentY() + 8;
 
 		UUID uuid = localUuid();
@@ -286,8 +302,18 @@ public final class CosmeticsScreen extends Screen {
 		return minecraft.getUser().getProfileId();
 	}
 
+	private int panelWidth() {
+		return Math.min(PANEL_WIDTH_MAX, width - GUTTER);
+	}
+
+	/** The preview is the first thing dropped when the panel has to shrink: the two lists carry
+	 * the information, and the model is the decoration. */
+	private boolean hasPreview() {
+		return panelWidth() >= PREVIEW_THRESHOLD;
+	}
+
 	private int panelX() {
-		return (width - PANEL_WIDTH) / 2;
+		return (width - panelWidth()) / 2;
 	}
 
 	private int panelY() {
@@ -299,14 +325,19 @@ public final class CosmeticsScreen extends Screen {
 	}
 
 	private int listX() {
-		return panelX() + PREVIEW_WIDTH + 12;
+		return panelX() + MARGIN + (hasPreview() ? PREVIEW_WIDTH + MARGIN : 0);
+	}
+
+	/** The cosmetics list and the presence column split whatever the preview left, evenly. */
+	private int listWidth() {
+		return (panelX() + panelWidth() - MARGIN - listX() - GUTTER) / 2;
 	}
 
 	private int presenceX() {
-		return listX() + LIST_WIDTH + 12;
+		return listX() + listWidth() + GUTTER;
 	}
 
 	private int presenceWidth() {
-		return panelX() + PANEL_WIDTH - 6 - presenceX();
+		return panelX() + panelWidth() - MARGIN - presenceX();
 	}
 }
