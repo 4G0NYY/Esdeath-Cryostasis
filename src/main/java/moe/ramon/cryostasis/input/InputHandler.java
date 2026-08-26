@@ -2,6 +2,7 @@ package moe.ramon.cryostasis.input;
 
 import moe.ramon.cryostasis.gui.ClickGuiScreen;
 import moe.ramon.cryostasis.gui.CosmeticsScreen;
+import moe.ramon.cryostasis.gui.HudEditorScreen;
 import moe.ramon.cryostasis.module.Module;
 import moe.ramon.cryostasis.module.ModuleManager;
 import moe.ramon.cryostasis.modules.misc.TabGuiModule;
@@ -28,6 +29,7 @@ public final class InputHandler {
 	private final ModuleManager modules;
 	private int openGuiKey = GLFW.GLFW_KEY_RIGHT_SHIFT;
 	private int openCosmeticsKey = GLFW.GLFW_KEY_RIGHT_CONTROL;
+	private int openHudEditorKey = GLFW.GLFW_KEY_RIGHT_ALT;
 
 	public InputHandler(ModuleManager modules) {
 		this.modules = modules;
@@ -48,6 +50,10 @@ public final class InputHandler {
 		// The cosmetics menu previews the local player, so it only opens in world.
 		if (key == openCosmeticsKey && mc.player != null) {
 			mc.setScreen(new CosmeticsScreen());
+			return;
+		}
+		if (key == openHudEditorKey) {
+			mc.setScreen(new HudEditorScreen());
 			return;
 		}
 		// Hold-to-look starts before anything can consume the key, since it is held rather than
@@ -95,5 +101,13 @@ public final class InputHandler {
 
 	public void setOpenCosmeticsKey(int key) {
 		this.openCosmeticsKey = key;
+	}
+
+	public int getOpenHudEditorKey() {
+		return openHudEditorKey;
+	}
+
+	public void setOpenHudEditorKey(int key) {
+		this.openHudEditorKey = key;
 	}
 }

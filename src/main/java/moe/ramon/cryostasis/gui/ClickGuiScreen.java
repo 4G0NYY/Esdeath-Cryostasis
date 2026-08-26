@@ -2,6 +2,7 @@ package moe.ramon.cryostasis.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import moe.ramon.cryostasis.Cryostasis;
+import moe.ramon.cryostasis.input.InputHandler;
 import moe.ramon.cryostasis.module.Category;
 import moe.ramon.cryostasis.module.Module;
 import moe.ramon.cryostasis.setting.BooleanSetting;
@@ -132,6 +133,14 @@ public final class ClickGuiScreen extends Screen {
 		if (bindingModule != null || bindingCapture != null) {
 			context.drawCenteredString(font,
 					"Press a key to bind, Escape to clear", width / 2, height - 14, COLOR_TEXT);
+		} else {
+			// The other two menus have no button anywhere, so the only place their keys can be
+			// discovered is the menu a new player does find.
+			InputHandler input = Cryostasis.get().getInputHandler();
+			context.drawCenteredString(font,
+					keyName(input.getOpenCosmeticsKey()) + " cosmetics    "
+							+ keyName(input.getOpenHudEditorKey()) + " move the HUD",
+					width / 2, height - 14, COLOR_SUBTEXT);
 		}
 	}
 

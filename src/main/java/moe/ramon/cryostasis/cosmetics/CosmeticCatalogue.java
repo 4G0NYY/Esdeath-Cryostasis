@@ -37,7 +37,8 @@ public final class CosmeticCatalogue {
 	}
 
 	/** Slugs with a model in this client. Keep in step with the layer's baked cosmetics. */
-	public static final Set<String> RENDERED = Set.of("halo", "bandana", "tophat");
+	public static final Set<String> RENDERED = Set.of(
+			"halo", "bandana", "tophat", "rabbitears", "reifen", "stripes", "tail", "wings", "susanoo");
 
 	private static final Map<String, String> DISPLAY_NAMES = Map.of(
 			"tophat", "Top Hat",
@@ -46,7 +47,13 @@ public final class CosmeticCatalogue {
 	private static final List<Entry> BUILT_IN = List.of(
 			new Entry("halo", "Halo", "Epic", null, true),
 			new Entry("bandana", "Bandana", "Default", null, true),
-			new Entry("tophat", "Top Hat", "Premium", null, true));
+			new Entry("tophat", "Top Hat", "Premium", null, true),
+			new Entry("wings", "Wings", "Epic", null, true),
+			new Entry("tail", "Tail", "Default", null, true),
+			new Entry("rabbitears", "Rabbit Ears", "Default", null, true),
+			new Entry("reifen", "Reifen", "Epic", null, true),
+			new Entry("susanoo", "Susanoo", "Chef", null, true),
+			new Entry("stripes", "Stripes", "Default", null, true));
 
 	/** Long enough that the menu is not a polling loop, short enough to pick up a new cosmetic. */
 	private static final long TTL_MS = 5 * 60 * 1000L;

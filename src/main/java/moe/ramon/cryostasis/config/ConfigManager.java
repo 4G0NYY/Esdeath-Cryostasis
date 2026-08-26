@@ -90,6 +90,7 @@ public final class ConfigManager {
 		if (module instanceof HudModule hud) {
 			obj.addProperty("anchorX", hud.getAnchorX());
 			obj.addProperty("anchorY", hud.getAnchorY());
+			obj.addProperty("detached", hud.isDetached());
 		}
 		JsonObject settings = new JsonObject();
 		for (Setting<?> setting : module.getSettings()) {
@@ -115,6 +116,9 @@ public final class ConfigManager {
 			}
 			if (module instanceof HudModule hud && obj.has("anchorX") && obj.has("anchorY")) {
 				hud.setAnchor(obj.get("anchorX").getAsDouble(), obj.get("anchorY").getAsDouble());
+				// An anchor only means anything once the element has left the auto-stacked
+				// column, so the two are restored together.
+				hud.setDetached(obj.has("detached") && obj.get("detached").getAsBoolean());
 			}
 			if (obj.has("settings") && obj.get("settings").isJsonObject()) {
 				JsonObject settings = obj.getAsJsonObject("settings");

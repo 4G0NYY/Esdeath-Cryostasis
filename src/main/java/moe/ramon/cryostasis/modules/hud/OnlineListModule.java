@@ -84,27 +84,29 @@ public final class OnlineListModule extends HudModule {
 			widest = Math.max(widest, DOT_WIDTH + GAP + font.width(line(entry)));
 		}
 
-		int blockHeight = lineHeight * rows;
-		int x = resolveX(context.guiWidth(), widest);
-		int y = resolveY(context.guiHeight(), blockHeight);
+		int width = widest + PAD * 2;
+		int height = lineHeight * rows + 2;
+		int x = resolveX(context.guiWidth(), width);
+		int y = resolveY(context.guiHeight(), height);
 
-		context.fill(x - PAD, y - 1, x + widest + PAD, y + blockHeight, BACKGROUND);
+		context.fill(x, y, x + width, y + height, BACKGROUND);
 
-		int cursor = y;
+		int cursor = y + 1;
+		int textX = x + PAD;
 		if (showHeader.get()) {
-			context.drawString(font, header, x, cursor, Theme.SUBTEXT);
+			context.drawString(font, header, textX, cursor, Theme.SUBTEXT);
 			cursor += lineHeight;
 		}
 		for (PresenceService.Entry entry : shown) {
 			// A filled square rather than a glyph: it reads as a state light at every GUI scale
 			// and needs no font that has a dot in it.
 			int dot = entry.isOnline() ? COLOR_ONLINE : COLOR_AWAY;
-			context.fill(x, cursor + 2, x + DOT_WIDTH - 2, cursor + font.lineHeight - 1, dot);
-			context.drawString(font, line(entry), x + DOT_WIDTH + GAP, cursor, entry.color());
+			context.fill(textX, cursor + 2, textX + DOT_WIDTH - 2, cursor + font.lineHeight - 1, dot);
+			context.drawString(font, line(entry), textX + DOT_WIDTH + GAP, cursor, entry.color());
 			cursor += lineHeight;
 		}
 
-		setBounds(x - PAD, y - 1, widest + PAD * 2, blockHeight + 1);
+		setBounds(x, y, width, height);
 	}
 
 	private String line(PresenceService.Entry entry) {

@@ -14,9 +14,20 @@ next key you press. Right clicking any setting puts it back to the value it ship
 
 ## HUD modules
 
-These draw information on your screen. Each is a draggable element: open the click GUI and
-drag it to reposition. Positions are stored as screen anchors, so they stay put when you
-resize the window.
+These draw information on your screen. Every one of them can be moved: press Right Alt to open
+the HUD editor, then drag. Positions are stored as screen anchors, so an element dropped against
+an edge stays against it when you resize the window or change GUI scale.
+
+Until you move one, HUD elements stack themselves down the top-left corner, each below the last,
+so turning several on never leaves them overlapping. Dragging one out of that column takes it out
+for good and the column closes up behind it. Right click an element in the editor to put it back;
+Backspace puts every element back.
+
+Dropping an element snaps it to the screen edges, the screen centre, and to the edges and centres
+of the other elements, with a guide line drawn along whatever caught it, so two elements line up
+exactly rather than nearly. Arrow keys nudge the selected element one pixel at a time. An element
+that has nothing to show at that moment, like the reach readout between swings, still appears in
+the editor as a small grey chip so it can be placed.
 
 | Module | What it shows | Settings |
 |---|---|---|
@@ -131,6 +142,12 @@ on trades swings for damage per swing, and turning it off spends those extra swi
 hits you would get from mashing the button yourself. Reach is measured from your eye to the
 nearest point of the target's box, which is what the game's own range check measures.
 
+AutoDodge watches every arrow in flight near you, walks its path forward, and checks whether that
+path would actually enter your hitbox. Only then does it shove you sideways, out of the line
+rather than across it, and only once every few ticks so a volley cannot stack shoves into a
+launch. Arrows you shot yourself and arrows already lodged in a block are ignored. The shove goes
+into the movement your client was sending anyway, so it is the same as having strafed.
+
 Reach raises the two distances the game keeps as attributes, 3 blocks to an entity and 4.5 to a
 block by default, and everything downstream follows: the crosshair picks a target further out,
 and the check on the swing accepts it. Neither setting ever shortens anything, so creative keeps
@@ -182,11 +199,15 @@ slot the totem came from, so a shield ends up where the totem was.
 For AutoText, bind a key and set the message in the click GUI. A message starting with `/`
 is sent as a command.
 
-TabGui sits in the bottom-left corner and needs no screen: up and down move through the
-categories, right (or enter) steps into one and toggles a module, and left steps back out.
-The module column opens to the right of the category column, so the menu grows the way the
-keys read. It only consumes the arrow keys while it is enabled; every other key still
-reaches your module hotkeys.
+TabGui needs no screen: up and down move through the categories, right (or enter) steps into one
+and toggles a module, and left steps back out. The module column opens to the right of the
+category row it belongs to and slides in, so the menu grows the way the keys read. The category
+column is a fixed size and is what carries the menu's position, which means stepping in and out of
+a category never moves the categories themselves. It only consumes the arrow keys while it is
+enabled; every other key still reaches your module hotkeys.
+
+TabGui is a HUD element like the rest, so the HUD editor moves it and its position is saved. It
+starts against the left edge, a third of the way down.
 
 GlobalChat is one channel shared by everyone running the client, independent of the server you
 happen to be playing on. Messages arrive in your ordinary chat, tagged `[EC]` and coloured by the
@@ -243,10 +264,23 @@ Cosmetics are free for every account, so what the backend stores is not who owns
 is currently wearing what. You see other players' cosmetics too, not just your own: the client
 fetches each visible player's active set and caches it.
 
-Currently rebuilt: TopHat, Halo, Bandana. More are planned (Wings, Tail, Rabbit ears,
-Reifen, Susanoo, Rotate, Stripes, and capes). The menu lists everything the backend offers, with
-the ones this client has no model for yet shown greyed out and marked "soon", so a cosmetic added
-server-side appears as soon as it exists rather than waiting for the client update that draws it.
+Rebuilt so far: TopHat, Halo, Bandana, Wings, Tail, Rabbit ears, Reifen, Stripes, and Susanoo,
+which is the whole catalogue the backend serves. Capes are still their own system and are not
+built yet. The menu lists everything the backend offers, with anything this client has no model
+for shown greyed out and marked "soon", so a cosmetic added server-side appears as soon as it
+exists rather than waiting for the client update that draws it.
+
+| Cosmetic | Where it sits | What it does |
+|---|---|---|
+| Halo | Above the head | Drifts up and down, level whichever way you look |
+| TopHat | On the head | Follows your head |
+| Bandana | On the head | Follows your head |
+| Rabbit ears | On the head | Splayed outward and leaning back, follows your head |
+| Wings | Upper back | Beats once a second and lags with your movement |
+| Tail | Lower back | Four joints that whip and settle with your movement |
+| Reifen | Waist | A red and white swim ring, hidden while sneaking |
+| Stripes | Around you | Six bars turning slowly and drifting up and down |
+| Susanoo | Around you | A translucent rib cage, still rather than animated |
 
 Textures come from the backend's CDN when it has one for a cosmetic, and from the mod's own
 resources otherwise, so the ones that ship with the client work whether or not the CDN is
@@ -267,6 +301,8 @@ roster the OnlineList HUD shows, so you can see who is around without turning th
 
 ## Opening the menu
 
-The click GUI key defaults to Right Shift, and the cosmetics menu to Right Ctrl. Module hotkeys
-can be set per module in the GUI (right click a module to expand it, then bind a key). Hotkeys
-never fire while a screen is open, so typing in chat is safe.
+The click GUI key defaults to Right Shift, the cosmetics menu to Right Ctrl, and the HUD editor to
+Right Alt. The click GUI shows the other two along its bottom edge, so there is one key to
+remember rather than three. Module hotkeys can be set per module in the GUI (right click a module
+to expand it, then bind a key). Hotkeys never fire while a screen is open, so typing in chat is
+safe.

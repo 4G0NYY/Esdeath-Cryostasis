@@ -21,8 +21,8 @@ No Minecraft code lives in this repository. The build ships as a Fabric mod jar 
 - Phase 0 (recover the specification): done. See `docs/feature-spec.md` and
   `docs/backend-api.md`.
 - Phase 1 (mod skeleton and framework): done. Module manager, settings, versioned JSON
-  config, keybind and input layer, internal event bus, click GUI, and a HUD engine with
-  anchored, draggable elements.
+  config, keybind and input layer, internal event bus, click GUI, and a HUD engine whose
+  elements are anchored and are dragged into place in an editor of their own.
 - Phase 2 (modules): done, and past the original spec. Forty-four modules across six
   categories.
   - HUD: FPS, CPS, XYZ, ReachDisplay, PingTag, Plains, MLGHelper, ArrayList, Rainbow,
@@ -43,10 +43,12 @@ No Minecraft code lives in this repository. The build ships as a Fabric mod jar 
   online, away and offline are worked out from each client's heartbeat rather than stored,
   so nothing has to announce that a player left. The same service serves the public site at
   the root of that domain, which reads its live roster from the API beneath it.
-- Phase 4 (cosmetics rendering): framework done. The backend-driven cosmetic layer is
-  wired onto the player renderer, with the TopHat, Halo, and Bandana models rebuilt, and
-  the in-game menu reads the catalogue from the backend. Visual correctness still needs a
-  live client pass, and the remaining cosmetics are pending.
+- Phase 4 (cosmetics rendering): built out. The backend-driven cosmetic layer is wired onto
+  the player renderer, the in-game menu reads the catalogue from the backend, and all nine
+  cosmetics the backend serves are rebuilt: TopHat, Halo, Bandana, Wings, Tail, Rabbit ears,
+  Reifen, Stripes, and Susanoo. Every model bakes and every uv rectangle has been checked
+  against the texture it reads from, but a live client pass is still what settles how they
+  look. Capes remain their own system and are not built.
 
 The parts that need a running client to verify (visual rendering, in-world modules) are
 marked as such in `Todo.md`. See it for the full roadmap and per-item progress.

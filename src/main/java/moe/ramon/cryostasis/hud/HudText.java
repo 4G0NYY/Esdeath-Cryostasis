@@ -11,6 +11,10 @@ import java.util.List;
  * translucent backdrop and reporting the bounds back to a {@link HudModule}. Keeps each
  * module's render method to the logic that is actually unique to it.
  *
+ * The anchor resolves against the whole plate rather than against the text inside it, so the
+ * rectangle the editor drags is the same rectangle the position is measured from. Resolving one
+ * and reporting the other makes every drag creep by the padding.
+ *
  * Color is resolved through {@link HudColors}: when rainbow mode is on the passed color is
  * overridden with the sweep so every element cycles together, with a small per-line phase
  * offset so stacked lines read as a gradient.
@@ -21,6 +25,7 @@ public final class HudText {
 	// Themed translucent plate behind text, matching the navy click GUI rows.
 	private static final int BACKGROUND = 0x900A111B;
 	private static final int PAD_X = 2;
+	private static final int PAD_Y = 1;
 
 	private HudText() {
 	}
@@ -32,15 +37,7 @@ public final class HudText {
 
 	/** Draw a single line at the module's anchor and record its bounds. */
 	public static void drawLine(HudModule module, GuiGraphics context, String text, int color) {
-		Font font = Minecraft.getInstance().font;
-		int width = font.width(text);
-		int height = font.lineHeight;
-		int x = module.resolveX(context.guiWidth(), width);
-		int y = module.resolveY(context.guiHeight(), height);
-
-		context.fill(x - PAD_X, y - 1, x + width + PAD_X, y + height, BACKGROUND);
-		context.drawString(font, text, x, y, HudColors.isRainbow() ? HudColors.rainbow(0.0f) : color);
-		module.setBounds(x - PAD_X, y - 1, width + PAD_X * 2, height + 1);
+		drawLines(module, context, List.of(text), color);
 	}
 
 	/** Draw a stack of lines at the module's anchor in the default color. */
@@ -56,17 +53,18 @@ public final class HudText {
 		for (String line : lines) {
 			widest = Math.max(widest, font.width(line));
 		}
-		int blockHeight = lineHeight * lines.size();
-		int x = module.resolveX(context.guiWidth(), widest);
-		int y = module.resolveY(context.guiHeight(), blockHeight);
+		int width = widest + PAD_X * 2;
+		int height = lineHeight * lines.size() + PAD_Y * 2;
+		int x = module.resolveX(context.guiWidth(), width);
+		int y = module.resolveY(context.guiHeight(), height);
 
-		context.fill(x - PAD_X, y - 1, x + widest + PAD_X, y + blockHeight, BACKGROUND);
-		int cursor = y;
+		context.fill(x, y, x + width, y + height, BACKGROUND);
+		int cursor = y + PAD_Y;
 		for (int i = 0; i < lines.size(); i++) {
 			int lineColor = HudColors.isRainbow() ? HudColors.rainbow(i * 0.08f) : color;
-			context.drawString(font, lines.get(i), x, cursor, lineColor);
+			context.drawString(font, lines.get(i), x + PAD_X, cursor, lineColor);
 			cursor += lineHeight;
 		}
-		module.setBounds(x - PAD_X, y - 1, widest + PAD_X * 2, blockHeight + 1);
+		module.setBounds(x, y, width, height);
 	}
 }

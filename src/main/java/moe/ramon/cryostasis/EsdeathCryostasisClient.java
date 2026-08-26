@@ -55,7 +55,6 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.PlayerRenderState;
@@ -99,16 +98,6 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 
 		HudRenderCallback.EVENT.register((drawContext, tickCounter) ->
 				cryostasis.getHudManager().render(drawContext, tickCounter.getGameTimeDeltaPartialTick(false)));
-
-		// The arrow-key TabGui draws its own overlay (it is not a stacked HUD element) and only
-		// while no screen is open and the HUD is visible, matching the rest of the overlay.
-		TabGuiModule tabGui = cryostasis.getModuleManager().get(TabGuiModule.class);
-		Minecraft minecraft = Minecraft.getInstance();
-		HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
-			if (tabGui.isEnabled() && minecraft.screen == null && !minecraft.options.hideGui) {
-				tabGui.render(drawContext);
-			}
-		});
 
 		// Persist on shutdown as a backstop; the GUI also saves when it closes.
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> cryostasis.getConfigManager().save());

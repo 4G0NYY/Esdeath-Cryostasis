@@ -30,7 +30,13 @@ public final class CosmeticLayer extends RenderLayer<PlayerRenderState, PlayerMo
 		this.cosmetics = List.of(
 				new TopHatCosmetic(context.bakeLayer(CosmeticModels.TOP_HAT)),
 				new HaloCosmetic(context.bakeLayer(CosmeticModels.HALO)),
-				new BandanaCosmetic(context.bakeLayer(CosmeticModels.BANDANA)));
+				new BandanaCosmetic(context.bakeLayer(CosmeticModels.BANDANA)),
+				new RabbitEarsCosmetic(context.bakeLayer(CosmeticModels.RABBIT_EARS)),
+				new ReifenCosmetic(context.bakeLayer(CosmeticModels.REIFEN)),
+				new StripesCosmetic(context.bakeLayer(CosmeticModels.STRIPES)),
+				new TailCosmetic(context.bakeLayer(CosmeticModels.TAIL)),
+				new WingsCosmetic(context.bakeLayer(CosmeticModels.WINGS)),
+				new SusanooCosmetic(context.bakeLayer(CosmeticModels.SUSANOO)));
 	}
 
 	@Override

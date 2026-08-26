@@ -44,7 +44,8 @@ public final class CosmeticsScreen extends Screen {
 	/** Below this there is no room for the preview, and the two lists get the space instead. */
 	private static final int PREVIEW_THRESHOLD = 360;
 	private static final int PANEL_HEIGHT = 200;
-	private static final int ROW_HEIGHT = 16;
+	private static final int ROW_HEIGHT = 14;
+	private static final int ROW_GAP = 1;
 	private static final int PREVIEW_WIDTH = 110;
 	private static final int GUTTER = 12;
 	private static final int MARGIN = 6;
@@ -153,7 +154,7 @@ public final class CosmeticsScreen extends Screen {
 
 		List<CosmeticCatalogue.Entry> entries = CosmeticCatalogue.entries();
 		for (CosmeticCatalogue.Entry entry : entries) {
-			if (rowY + ROW_HEIGHT > panelY() + PANEL_HEIGHT - 18) {
+			if (rowY + ROW_HEIGHT > listBottom()) {
 				// The catalogue can outgrow the panel; the rest is reachable once the list
 				// scrolls, which is not built yet, so stop rather than draw over the footer.
 				break;
@@ -172,7 +173,7 @@ public final class CosmeticsScreen extends Screen {
 			String state = !entry.renderable() ? "soon" : on ? "on" : "off";
 			context.drawString(font, state, listRight - font.width(state) - 4, rowY + 4,
 					on && entry.renderable() ? Theme.ACCENT : Theme.SUBTEXT);
-			rowY += ROW_HEIGHT + 2;
+			rowY += ROW_HEIGHT + ROW_GAP;
 		}
 
 		context.drawString(font, "Click a row to toggle", listX, panelY() + PANEL_HEIGHT - 16, Theme.SUBTEXT);
@@ -271,6 +272,9 @@ public final class CosmeticsScreen extends Screen {
 		CosmeticService.Active active = service.get(uuid);
 
 		for (CosmeticCatalogue.Entry entry : CosmeticCatalogue.entries()) {
+			if (rowY + ROW_HEIGHT > listBottom()) {
+				break;
+			}
 			if (mouseX >= listX && mouseX <= listRight && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT) {
 				if (!entry.renderable()) {
 					return true;
@@ -282,7 +286,7 @@ public final class CosmeticsScreen extends Screen {
 				}
 				return true;
 			}
-			rowY += ROW_HEIGHT + 2;
+			rowY += ROW_HEIGHT + ROW_GAP;
 		}
 		return super.mouseClicked(mouseX, mouseY, button);
 	}
@@ -322,6 +326,11 @@ public final class CosmeticsScreen extends Screen {
 
 	private int contentY() {
 		return panelY() + HEADER_HEIGHT;
+	}
+
+	/** Where the cosmetics list has to stop, leaving the footer line its own room. */
+	private int listBottom() {
+		return panelY() + PANEL_HEIGHT - 18;
 	}
 
 	private int listX() {

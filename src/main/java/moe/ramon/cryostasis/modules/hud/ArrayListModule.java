@@ -21,6 +21,8 @@ import java.util.List;
  * happens while this HUD is enabled.
  */
 public final class ArrayListModule extends HudModule {
+	private static final int PAD = 2;
+
 	private final BooleanSetting background = register(new BooleanSetting("Background", true));
 
 	private final List<Module> sorted = new ArrayList<>();
@@ -55,22 +57,29 @@ public final class ArrayListModule extends HudModule {
 		}
 		sorted.sort(byWidthDesc);
 
-		int screenWidth = context.guiWidth();
 		int lineHeight = font.lineHeight + 1;
 		int widest = 0;
-		int y = 2;
+		for (int i = 0; i < sorted.size(); i++) {
+			widest = Math.max(widest, font.width(sorted.get(i).getHudLabel()));
+		}
+		int width = widest + PAD * 2;
+		int height = lineHeight * sorted.size() + PAD;
+		int x = resolveX(context.guiWidth(), width);
+		int y = resolveY(context.guiHeight(), height);
+
+		int rowY = y + PAD;
 		for (int i = 0; i < sorted.size(); i++) {
 			String label = sorted.get(i).getHudLabel();
-			int width = font.width(label);
-			widest = Math.max(widest, width);
-			int x = screenWidth - width - 2;
+			// Right aligned inside the block, which is what gives the list its staircase edge
+			// however the block itself has been dragged.
+			int labelX = x + width - PAD - font.width(label);
 			if (background.get()) {
-				context.fill(x - 2, y - 1, screenWidth, y + font.lineHeight, 0x90000000);
+				context.fill(labelX - PAD, rowY - 1, x + width, rowY + font.lineHeight, 0x90000000);
 			}
 			int color = HudColors.isRainbow() ? HudColors.rainbow(i * 0.08f) : 0xFFFFFFFF;
-			context.drawString(font, label, x, y, color);
-			y += lineHeight;
+			context.drawString(font, label, labelX, rowY, color);
+			rowY += lineHeight;
 		}
-		setBounds(screenWidth - widest - 4, 2, widest + 4, y - 2);
+		setBounds(x, y, width, height);
 	}
 }
