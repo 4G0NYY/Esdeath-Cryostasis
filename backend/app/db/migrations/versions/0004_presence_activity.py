@@ -35,12 +35,12 @@ def upgrade() -> None:
         "chat_messages",
         sa.Column("state", sa.String(16), nullable=False, server_default="online"),
     )
-    # The roster query filters on the presence window and orders by activity, so both presence
-    # timestamps are worth an index once the table holds more than a handful of players.
-    op.create_index("ix_players_last_seen", "players", ["last_seen"])
+    # No index is added here. The roster filters on the presence window, which wants one on
+    # players.last_seen, and 0001 already created exactly that; adding it again is what broke the
+    # first attempt at this migration. app/db/models.py now declares index=True on that column so
+    # the model says what the database has always had.
 
 
 def downgrade() -> None:
-    op.drop_index("ix_players_last_seen", table_name="players")
     op.drop_column("chat_messages", "state")
     op.drop_column("players", "last_active")
