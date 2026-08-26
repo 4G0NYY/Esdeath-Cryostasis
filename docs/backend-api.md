@@ -75,10 +75,10 @@ capes and cosmetics move behind object storage plus a CDN.
 |---|---|---|---|
 | getVersion | `GET /version` | - | `{ "version": "..." }` |
 | getAllCapes | `GET /capes` | - | `{ "capes": [{ "name": "...", "rarity": "..." }] }` |
-| addMe | `POST /players/{uuid}/online` | - | `204` |
+| addMe | `POST /players/{uuid}/online` | `{ "active": bool, "server": "..." }` (optional) | `204` |
 | ImOnServer | `PUT /players/{uuid}/server` | `{ "server": "..." }` | `204` |
 | setMyPlayerStatus | `PUT /players/{uuid}/status` | `{ "status": "..." }` | `204` |
-| getTheStatusOfThePlayer | `GET /players/{uuid}/status` | - | `{ "status": "..." }` |
+| getTheStatusOfThePlayer | `GET /players/{uuid}/status` | - | `{ "status": "...", "state": "...", ... }` |
 | getRankofPlayer | `GET /players/{uuid}/rank` | - | `{ "rank": "..." }` |
 | getPlayersOnServer | `GET /servers/{server}/players` | - | `{ "players": [...] }` |
 | getOnlinePlayingPlayers | `GET /players/online` | - | `{ "players": [...], "count": N }` |
@@ -103,6 +103,8 @@ here because this document owns the contract, and the shipped client parses them
 
 | Method and path | Auth | Request body | Response |
 |---|---|---|---|
+| `GET /players/presence` | none | - | `{ "players": [...], "count": N, "online": N, "afk": N }` |
+| `POST /players/presence/batch` | none | `{ "uuids": [...] }` | `{ "players": { "<uuid>": {...} } }` |
 | `POST /auth/nonce` | none | - | `{ "server_id": "..." }` |
 | `POST /auth/session` | none | `{ "uuid": "...", "username": "...", "server_id": "..." }` | `{ "token": "...", "token_type": "Bearer", "expires_in": N }` |
 | `POST /players/cosmetics/batch` | none | `{ "uuids": [...] }` | `{ "players": { "<uuid>": { "cosmetics": [...], "cape": "..." } } }` |
@@ -122,7 +124,55 @@ line from the same palette the API stamps onto messages rather than keeping its 
 `CRYOSTASIS_ADMIN_TOKEN`; an unset token disables those routes outright. "staff" means either
 that header or a bearer token whose player holds a rank marked `staff` in the registry.
 
-## 6. Global chat
+## 6. Presence: online, away, offline
+
+Presence is derived from two timestamps on the player row rather than stored as a state, for the
+reason section 6 of `docs/backend-architecture.md` gives: nothing clears a stored state when a
+client crashes.
+
+- `last_seen` is written by every heartbeat. Inside `CRYOSTASIS_PRESENCE_WINDOW_SECONDS`
+  (120 by default) the client counts as connected.
+- `last_active` is written only when a heartbeat reports `active: true`. Past
+  `CRYOSTASIS_AFK_AFTER_SECONDS` (300 by default) the player counts as away.
+
+So `offline` when the window has lapsed, `afk` when it has not but activity has, `online`
+otherwise. A record that has never reported activity reads as `afk` rather than `online`: there
+is nothing saying the player was ever at the keyboard.
+
+`POST /players/{uuid}/online` takes an optional body:
+
+```json
+{ "active": true, "server": "hypixel.net" }
+```
+
+Both fields are optional and the body itself may be omitted, which is what the recovered `addMe`
+did. Such a caller stays `afk` forever, which is the honest answer for a client with no way to
+report otherwise. `server` is honoured exactly as `PUT /players/{uuid}/server` would, so a client
+that has just joined a server needs one call rather than two.
+
+Two endpoints read presence back. `GET /players/presence` is the roster: everyone inside the
+window, away players included, since away is a sub-state of connected and dropping them would
+make the roster empty whenever everyone is standing still. Each entry is:
+
+```json
+{ "uuid": "...", "username": "Ray", "rank": "Chef", "color": "#E8B14C",
+  "state": "afk", "status": "at the anvil", "server": "hypixel.net",
+  "last_seen": "2026-08-26T06:34:26Z", "last_active": "2026-08-26T06:29:02Z" }
+```
+
+`POST /players/presence/batch` answers the same shape for a named list of UUIDs, offline ones
+included, keyed by the UUID as sent. It exists because the surfaces that render other players
+(name tags, chat) already know which players are in front of them and would otherwise pull the
+whole roster to find three rows in it.
+
+`GET /players/{uuid}/status` returns that same object. `status` is unchanged: it is still the
+free text the player set, so a caller written against the recovered `getTheStatusOfThePlayer`
+reads the same value out of the same key. Everything beside it is additive.
+
+`status` and `state` are deliberately separate. One is a line a player wrote, the other is a fact
+about their client that nobody can set.
+
+## 7. Global chat
 
 Delivery is a polled log rather than a stream, because the service runs as several stateless
 replicas with nothing to broadcast through: Postgres `LISTEN/NOTIFY` does not survive
@@ -148,11 +198,18 @@ already knows is empty. A message is:
 
 ```json
 { "id": 12, "uuid": "...", "username": "Ray", "rank": "Chef",
-  "color": "#E8B14C", "message": "...", "at": "2026-08-25T20:48:33Z" }
+  "color": "#E8B14C", "message": "...", "state": "online",
+  "at": "2026-08-25T20:48:33Z" }
 ```
 
-`username`, `rank` and `color` are a snapshot taken when the line was posted, so rendering it
-needs no further lookups and a later promotion does not rewrite history.
+`username`, `rank`, `color` and `state` are a snapshot taken when the line was posted, so
+rendering it needs no further lookups and a later promotion does not rewrite history.
+
+`state` is the sender's presence (section 6) as it stood at post time. Posting counts as a
+heartbeat, since the line is proof the client is alive, so a message is never stamped `offline`;
+it is not in-world activity, so it does not clear `afk`. A line stamped `afk` therefore means the
+sender's character had been parked while they typed, which on a channel spanning many game
+servers is the difference between someone playing and someone watching the chat from a menu.
 
 `POST /chat` takes `{ "message": "..." }` and returns the stored message. With auth on, the
 sender is taken entirely from the bearer token and the username the session proof recorded, never

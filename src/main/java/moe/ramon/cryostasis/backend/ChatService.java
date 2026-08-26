@@ -35,6 +35,8 @@ public final class ChatService {
 
 	private static final long RETRY_DELAY_MS = 5000L;
 	private static final int TAG_COLOR = 0xFF5A8FC7;
+	/** The same amber the roster and the in-world tag use for an away player. */
+	private static final int AFK_COLOR = 0xFFE8B14C;
 
 	private final ApiClient api;
 	private final SessionService session;
@@ -139,7 +141,15 @@ public final class ChatService {
 		}
 	}
 
-	/** Render one message as {@code [EC] [Rank] Name: text}, coloured by the sender's rank. */
+	/**
+	 * Render one message as {@code [EC] [Rank] Name: text}, coloured by the sender's rank.
+	 *
+	 * An away sender is marked. The state is a snapshot the backend stamped when the line landed,
+	 * not a live lookup, so it says what it meant at the time and a later promotion or a walk back
+	 * to the keyboard does not rewrite history. It means the sender's character had been parked
+	 * past the away threshold while they typed, which on a channel spanning many game servers is
+	 * the difference between someone playing and someone watching the chat from a menu.
+	 */
 	private static Component format(JsonObject message) {
 		String username = string(message, "username", "Player");
 		String rank = string(message, "rank", "Default");
@@ -152,6 +162,10 @@ public final class ChatService {
 		// every line would be noise rather than information.
 		if (!"Default".equalsIgnoreCase(rank)) {
 			line.append(Component.literal("[" + rank + "] ").withStyle(rankStyle));
+		}
+		if (PresenceService.AFK.equals(string(message, "state", PresenceService.ONLINE))) {
+			line.append(Component.literal("[AFK] ")
+					.withStyle(Style.EMPTY.withColor(TextColor.fromRgb(AFK_COLOR & 0xFFFFFF))));
 		}
 		return line.append(Component.literal(username).withStyle(rankStyle))
 				.append(Component.literal(": ").withStyle(ChatFormatting.GRAY))

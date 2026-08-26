@@ -5,6 +5,7 @@ import moe.ramon.cryostasis.modules.hud.ArrayListModule;
 import moe.ramon.cryostasis.modules.hud.CpsModule;
 import moe.ramon.cryostasis.modules.hud.FpsModule;
 import moe.ramon.cryostasis.modules.hud.MlgHelperModule;
+import moe.ramon.cryostasis.modules.hud.OnlineListModule;
 import moe.ramon.cryostasis.modules.hud.PingTagModule;
 import moe.ramon.cryostasis.modules.hud.PlainsModule;
 import moe.ramon.cryostasis.modules.hud.RainbowModule;
@@ -41,11 +42,13 @@ import moe.ramon.cryostasis.modules.render.FreelookModule;
 import moe.ramon.cryostasis.modules.render.HitboxModule;
 import moe.ramon.cryostasis.modules.render.NightvisionModule;
 import moe.ramon.cryostasis.modules.render.NoBlindModule;
+import moe.ramon.cryostasis.modules.render.StatusTagModule;
 import moe.ramon.cryostasis.modules.render.XrayModule;
 import moe.ramon.cryostasis.modules.render.ZoomModule;
 import moe.ramon.cryostasis.cosmetics.CosmeticCatalogue;
 import moe.ramon.cryostasis.cosmetics.render.CosmeticLayer;
 import moe.ramon.cryostasis.cosmetics.render.CosmeticModels;
+import moe.ramon.cryostasis.render.StatusTagLayer;
 import moe.ramon.cryostasis.render.WorldRenderHooks;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -76,10 +79,11 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		// World-render modules draw through Fabric's render events, not their own Mixins.
 		WorldRenderHooks.register(cryostasis.getModuleManager());
 
-		// Cosmetics: register model layers, then attach the cosmetic layer to the player
-		// renderer so owned cosmetics draw on every visible player.
+		// Cosmetics: register model layers, then attach the player render layers so owned
+		// cosmetics and the presence status tag draw on every visible player. Both go on here
+		// because a render layer is attached once at startup and cannot be added later.
 		CosmeticModels.registerLayers();
-		registerCosmeticLayer();
+		registerPlayerLayers();
 		// The catalogue and its CDN textures come from the backend, so it needs the connection.
 		CosmeticCatalogue.bind(cryostasis.getApiClient());
 
@@ -87,6 +91,9 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 			// Ahead of the modules, because the backend enforces auth: a module that writes on
 			// this tick wants the token already in hand.
 			cryostasis.getSessionService().tick();
+			// Presence is not gated on a module: whether this player shows as online is a
+			// property of the client running, not of any one feature being switched on.
+			cryostasis.getPresenceService().tick();
 			cryostasis.getModuleManager().onTick();
 		});
 
@@ -111,12 +118,15 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 	}
 
 	@SuppressWarnings("unchecked")
-	private void registerCosmeticLayer() {
+	private void registerPlayerLayers() {
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, entityRenderer, helper, context) -> {
 			if (entityType == EntityType.PLAYER) {
 				// The player renderer is a RenderLayerParent for the player state and model.
-				helper.register(new CosmeticLayer(
-						(RenderLayerParent<PlayerRenderState, PlayerModel>) (Object) entityRenderer, context));
+				RenderLayerParent<PlayerRenderState, PlayerModel> parent =
+						(RenderLayerParent<PlayerRenderState, PlayerModel>) (Object) entityRenderer;
+				helper.register(new CosmeticLayer(parent, context));
+				// After the cosmetics, so the tag is not hidden behind anything worn on the head.
+				helper.register(new StatusTagLayer(parent));
 			}
 		});
 	}
@@ -132,6 +142,7 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new MlgHelperModule());
 		modules.register(new ArrayListModule());
 		modules.register(new RainbowModule());
+		modules.register(new OnlineListModule());
 		// Movement
 		modules.register(new ToggleSprintModule());
 		modules.register(new SafeWalkModule());
@@ -152,6 +163,7 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new NightvisionModule());
 		modules.register(new FreecamModule());
 		modules.register(new FreelookModule());
+		modules.register(new StatusTagModule());
 		// Combat
 		modules.register(new MoreParticlesModule());
 		modules.register(new SharpnessModule());

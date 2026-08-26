@@ -1,5 +1,8 @@
 """App factory, middleware, router mounting.
 
+The public site is mounted at the root after the routers, so it serves whatever /api and
+/health did not claim (app/web.py).
+
 Routers are mounted at /api with no version segment, matching the shipped client, which
 hardcodes /api via the cryostasis.api system property (CosmeticService). The api/v1 package
 name keeps a version seam in the code without putting one in the URL; a future v2 would
@@ -17,6 +20,7 @@ from fastapi import FastAPI
 from app.api.deps import RateLimiter
 from app.api.v1 import auth, chat, cosmetics, meta, players
 from app.config import Settings, get_settings
+from app.web import mount_site
 
 
 def _build_backends(settings: Settings):
@@ -75,6 +79,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health")
     async def health() -> dict:
         return {"status": "ok"}
+
+    # Last, so the root mount only ever sees paths the API and the probe did not claim.
+    mount_site(app, settings.site_dir)
 
     return app
 

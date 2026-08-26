@@ -8,3 +8,9 @@ tests/
 .env
 .git/
 *.egg-info/
+
+# The site's node_modules and its previously built bundle: the image builds dist/ in its own
+# stage, so shipping either only slows the context upload and risks a stale bundle landing on
+# top of the fresh one.
+web/node_modules/
+web/dist/

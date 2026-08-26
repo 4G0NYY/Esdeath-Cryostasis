@@ -14,10 +14,13 @@ from app.api.deps import get_repo, require_admin, require_caller, settings_dep
 from app.config import Settings
 from app.domain.models import (
     CapeBody,
+    PresenceBatchBody,
+    PresenceBody,
     RankBody,
     ServerBody,
     StatusBody,
     normalize_uuid,
+    presence_view,
     resolve_rank,
 )
 from app.repo.base import Repo
@@ -25,13 +28,64 @@ from app.repo.base import Repo
 router = APIRouter()
 
 
-# Static path first so "online" is never parsed as a {uuid}.
+# Static paths first so "online" and "presence" are never parsed as a {uuid}.
 @router.get("/players/online")
 async def online_players(
     repo: Repo = Depends(get_repo), settings: Settings = Depends(settings_dep)
 ) -> dict:
     players = await repo.online_players(settings.presence_window_seconds)
     return {"players": players, "count": len(players)}
+
+
+@router.get("/players/presence")
+async def presence_roster(
+    repo: Repo = Depends(get_repo), settings: Settings = Depends(settings_dep)
+) -> dict:
+    """Everyone whose client is currently beating, AFK players included.
+
+    Separate from /players/online rather than an extra field on it: that route answers the
+    recovered getOnlinePlayingPlayers with a bare list of UUIDs and the shipped client parses it,
+    so it stays exactly as it is. This one is the roster, and it carries enough per player to
+    render a line without a follow-up call.
+
+    AFK is a sub-state of connected, so an idle player appears here. Dropping them would be the
+    same mistake a stored online flag makes: the roster would say nobody is around whenever
+    everybody is merely standing still.
+    """
+    players = [
+        presence_view(p, settings.presence_window_seconds, settings.afk_after_seconds)
+        for p in await repo.presence(settings.presence_window_seconds)
+    ]
+    return {
+        "players": [p.model_dump(mode="json") for p in players],
+        "count": len(players),
+        "online": sum(1 for p in players if p.state == "online"),
+        "afk": sum(1 for p in players if p.state == "afk"),
+    }
+
+
+@router.post("/players/presence/batch")
+async def presence_batch(
+    body: PresenceBatchBody,
+    repo: Repo = Depends(get_repo),
+    settings: Settings = Depends(settings_dep),
+) -> dict:
+    """Presence for a named set of players, including offline ones.
+
+    The roster above answers "who is around"; this answers "what about these players", which is
+    what the nametag and chat surfaces need: they already know which UUIDs are in front of them
+    and would otherwise pull the whole roster to find three rows in it. Keyed by the UUID as
+    sent, matching the cosmetics batch, so a caller matches replies back without re-normalizing.
+    """
+    players = await repo.get_players(body.uuids)
+    return {
+        "players": {
+            uuid: presence_view(
+                player, settings.presence_window_seconds, settings.afk_after_seconds
+            ).model_dump(mode="json")
+            for uuid, player in players.items()
+        }
+    }
 
 
 @router.get("/servers/{server}/players")
@@ -44,11 +98,23 @@ async def players_on_server(
 
 @router.post("/players/{uuid}/online", status_code=204)
 async def mark_online(
-    caller: str = Depends(require_caller), repo: Repo = Depends(get_repo)
+    body: PresenceBody | None = None,
+    caller: str = Depends(require_caller),
+    repo: Repo = Depends(get_repo),
 ) -> Response:
-    # Presence heartbeat: records last_seen so online is derived from a fresh timestamp
-    # (architecture 6) rather than a boolean that leaks on a crash.
-    await repo.touch(caller)
+    """Presence heartbeat.
+
+    Records last_seen so online is derived from a fresh timestamp (architecture 6) rather than a
+    boolean that leaks on a crash, and last_active when the body says the player did something,
+    which is what AFK is derived from.
+
+    The body is optional so the recovered addMe contract, which had none, still beats: such a
+    caller is simply always AFK, which is the honest answer for a client that cannot report
+    otherwise.
+    """
+    await repo.touch(caller, active=body.active if body else False)
+    if body is not None and body.server is not None:
+        await repo.set_server(caller, body.server)
     return Response(status_code=204)
 
 
@@ -69,8 +135,15 @@ async def set_status(
 
 
 @router.get("/players/{uuid}/status")
-async def get_status(uuid: str, repo: Repo = Depends(get_repo)) -> dict:
-    return {"status": (await repo.get_player(normalize_uuid(uuid))).status}
+async def get_status(
+    uuid: str, repo: Repo = Depends(get_repo), settings: Settings = Depends(settings_dep)
+) -> dict:
+    # status is the contract field the recovered getTheStatusOfThePlayer returned and stays the
+    # free text the player set. Everything beside it is derived and additive, so a caller written
+    # against the recovered shape still reads correctly.
+    player = await repo.get_player(normalize_uuid(uuid))
+    view = presence_view(player, settings.presence_window_seconds, settings.afk_after_seconds)
+    return view.model_dump(mode="json")
 
 
 @router.get("/players/{uuid}/rank")

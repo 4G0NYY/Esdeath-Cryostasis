@@ -41,6 +41,24 @@ async def test_post_then_read_backlog(client):
     assert body["cursor"] == stored["id"]
 
 
+async def test_message_carries_the_senders_presence_state(client, uuid):
+    # Posting is proof the client is alive, so a line is never stamped offline, but it is not
+    # in-world activity, so a player whose character has been parked is stamped afk. That is the
+    # whole information the tag carries: someone is watching the channel, not playing.
+    async with make_client(chat_settings(afk_after_seconds=1)) as c:
+        await c.post(f"/api/players/{uuid}/online", json={"active": True})
+        assert (await post(c, "just landed", uuid=uuid)).json()["state"] == "online"
+
+        await asyncio.sleep(1.1)
+        assert (await post(c, "still here, not playing", uuid=uuid)).json()["state"] == "afk"
+
+
+async def test_a_never_seen_sender_is_not_stamped_offline(client):
+    # A dev instance and a client with the presence module off both post without ever beating.
+    # The line still came from a live client, so stamping it offline would be a lie.
+    assert (await post(client, "hello", username="Ray")).json()["state"] == "afk"
+
+
 async def test_cursor_returns_only_new_messages(client):
     await post(client, "first")
     cursor = (await client.get("/api/chat")).json()["cursor"]

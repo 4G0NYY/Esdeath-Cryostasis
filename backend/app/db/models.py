@@ -28,7 +28,12 @@ class PlayerRow(Base):
     status: Mapped[str] = mapped_column(String(256), default="", server_default="")
     server: Mapped[str] = mapped_column(String(128), default="", server_default="")
     cape: Mapped[str] = mapped_column(String(128), default="", server_default="")
-    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    # Written only when a heartbeat reports the player did something, so the gap between this
+    # and last_seen is what separates an idle client from a live one.
+    last_active: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -96,6 +101,7 @@ class ChatMessageRow(Base):
     rank: Mapped[str] = mapped_column(String(32), default="Default", server_default="Default")
     color: Mapped[str] = mapped_column(String(16), default="", server_default="")
     message: Mapped[str] = mapped_column(Text)
+    state: Mapped[str] = mapped_column(String(16), default="online", server_default="online")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )

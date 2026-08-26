@@ -106,12 +106,25 @@ CATALOGUE: dict[str, CosmeticEntry] = {
 }
 
 
+# Presence states. Derived from two timestamps rather than stored, for the reason architecture 6
+# gives for presence generally: a stored state is a state something has to clear, and nothing
+# clears it when a client crashes. ONLINE and AFK both mean the client is connected and beating;
+# they differ only in whether the player has touched anything recently.
+STATE_ONLINE = "online"
+STATE_AFK = "afk"
+STATE_OFFLINE = "offline"
+
+
 class Player(BaseModel):
     """All per-player state the protocol exposes. Mirrors Store.Player from the Java dev
     instance, with last_seen replacing the stored `online` boolean (architecture 6).
 
     username is recorded during the session proof, never taken from a caller's request body, so
-    the name global chat renders is one Mojang authenticated rather than one a client chose."""
+    the name global chat renders is one Mojang authenticated rather than one a client chose.
+
+    last_active is the second half of presence: last_seen answers "is this client still there",
+    last_active answers "is the player doing anything". A client heartbeats either way, so an
+    idle player stays visible instead of blinking out the way a stored online flag would."""
 
     uuid: str
     username: str = ""
@@ -121,11 +134,60 @@ class Player(BaseModel):
     cape: str = ""
     cosmetics: set[str] = Field(default_factory=set)
     last_seen: datetime | None = None
+    last_active: datetime | None = None
 
     def is_online(self, window_seconds: int) -> bool:
         if self.last_seen is None:
             return False
-        return (now() - self.last_seen).total_seconds() < window_seconds
+        return (now() - as_utc(self.last_seen)).total_seconds() < window_seconds
+
+    def presence_state(self, window_seconds: int, afk_after_seconds: int) -> str:
+        """One of the three states above.
+
+        Offline dominates: a client that stopped heartbeating is gone whatever it was doing
+        last. A player who has never been active reads as AFK rather than online, since a fresh
+        record has nothing to say they were ever at the keyboard.
+        """
+        if not self.is_online(window_seconds):
+            return STATE_OFFLINE
+        if self.last_active is None:
+            return STATE_AFK
+        idle = (now() - as_utc(self.last_active)).total_seconds()
+        return STATE_AFK if idle >= afk_after_seconds else STATE_ONLINE
+
+
+class PresenceView(BaseModel):
+    """A player as the presence endpoints report them: the derived state plus everything a
+    client needs to render a roster line without a second lookup.
+
+    `status` is the free-text line a player sets for themselves and is deliberately separate
+    from `state`, which nobody sets: one is a mood, the other is a fact about their client.
+    """
+
+    uuid: str
+    username: str = ""
+    rank: str = "Default"
+    color: str = DEFAULT_RANK.color
+    state: str = STATE_OFFLINE
+    status: str = ""
+    server: str = ""
+    last_seen: datetime | None = None
+    last_active: datetime | None = None
+
+
+def presence_view(player: Player, window_seconds: int, afk_after_seconds: int) -> PresenceView:
+    entry = resolve_rank(player.rank)
+    return PresenceView(
+        uuid=player.uuid,
+        username=player.username,
+        rank=entry.name,
+        color=entry.color,
+        state=player.presence_state(window_seconds, afk_after_seconds),
+        status=player.status,
+        server=player.server,
+        last_seen=player.last_seen,
+        last_active=player.last_active,
+    )
 
 
 # Request bodies. Each matches the JSON the Java server read via Gson, field for field.
@@ -135,6 +197,26 @@ class ServerBody(BaseModel):
 
 class StatusBody(BaseModel):
     status: str
+
+
+class PresenceBody(BaseModel):
+    """The heartbeat body. Optional in full: the recovered addMe carried nothing, and a client
+    written against that contract still beats correctly and simply never leaves AFK.
+
+    `active` is the client saying the player did something in world since its last beat, which is
+    the only thing that can distinguish idle from gone; a server that saw only heartbeats could
+    not tell them apart. `server` piggybacks so joining a server is one call rather than two.
+    """
+
+    active: bool = False
+    server: str | None = None
+
+
+class PresenceBatchBody(BaseModel):
+    """Presence for a named set of players, for the surfaces that ask about who they can see
+    rather than about who is around: nametags and chat lines."""
+
+    uuids: list[str]
 
 
 class CapeBody(BaseModel):
@@ -187,6 +269,11 @@ class ChatMessage(BaseModel):
     color: str
     message: str
     at: datetime
+    # The sender's presence state as it stood when the line landed, snapshotted for the same
+    # reason rank and colour are. It says whether their character was parked while they typed,
+    # which on a channel spanning many game servers is the difference between someone playing
+    # and someone watching the chat from a menu.
+    state: str = STATE_ONLINE
 
     @field_validator("at")
     @classmethod

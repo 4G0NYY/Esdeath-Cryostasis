@@ -73,15 +73,20 @@ class MemoryRepo:
         async with self._lock:
             player = self._ensure(uuid)
             player.server = server
+            # Joining a server is both presence and activity: somebody clicked something.
             player.last_seen = now()
+            player.last_active = now()
 
     async def set_cape(self, uuid: str, cape: str) -> None:
         async with self._lock:
             self._ensure(uuid).cape = cape
 
-    async def touch(self, uuid: str) -> None:
+    async def touch(self, uuid: str, active: bool = False) -> None:
         async with self._lock:
-            self._ensure(uuid).last_seen = now()
+            player = self._ensure(uuid)
+            player.last_seen = now()
+            if active:
+                player.last_active = now()
 
     async def add_cosmetic(self, uuid: str, slug: str) -> bool:
         async with self._lock:
@@ -102,6 +107,14 @@ class MemoryRepo:
     async def online_players(self, window_seconds: int) -> list[str]:
         async with self._lock:
             return [u for u, p in self._players.items() if p.is_online(window_seconds)]
+
+    async def presence(self, window_seconds: int) -> list[Player]:
+        async with self._lock:
+            return [
+                p.model_copy(deep=True)
+                for p in self._players.values()
+                if p.is_online(window_seconds)
+            ]
 
     async def players_on_server(self, server: str, window_seconds: int) -> list[str]:
         async with self._lock:

@@ -56,6 +56,27 @@ async def test_server_marks_online(repo):
     assert UUID in await repo.players_on_server("HYPIXEL", 120)
 
 
+async def test_activity_is_only_recorded_when_reported(repo):
+    await repo.touch(UUID)
+    assert (await repo.get_player(UUID)).last_active is None
+    await repo.touch(UUID, active=True)
+    assert (await repo.get_player(UUID)).last_active is not None
+
+
+async def test_presence_returns_whole_records(repo):
+    # The roster needs names and both timestamps, which is why this returns players rather than
+    # the UUIDs online_players answers with.
+    assert await repo.presence(120) == []
+    await repo.set_username(UUID, "Ray")
+    await repo.touch(UUID, active=True)
+
+    roster = await repo.presence(120)
+    assert [p.uuid for p in roster] == [UUID]
+    assert roster[0].username == "Ray"
+    assert roster[0].presence_state(120, 300) == "online"
+    assert await repo.presence(0) == []
+
+
 async def test_batch(repo):
     await repo.add_cosmetic(UUID, "halo")
     other = "11111111-1111-1111-1111-111111111111"

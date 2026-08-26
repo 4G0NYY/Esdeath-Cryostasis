@@ -36,6 +36,15 @@ launcher/*.syso
 launcher/frontend/wailsjs/
 launcher/frontend/package.json.md5
 
+# The backend's public site (backend/web). node_modules and the built bundle are generated: the
+# Dockerfile builds dist/ in its own stage, and a local `npm run build` in backend/web is only
+# needed to preview the page against a locally running API.
+backend/web/node_modules/
+backend/web/dist/
+
+# The local virtualenv the backend test suite runs in. CI installs its own inside a container.
+backend/.venv/
+
 # Loom / Fabric
 run/
 *.log

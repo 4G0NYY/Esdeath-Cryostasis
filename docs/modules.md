@@ -5,6 +5,13 @@ GUI with Right Shift, left click a module to toggle it, right click to expand it
 settings, and drag a category header to move the panel. Settings save automatically when
 you close the menu.
 
+Editing a setting depends on what kind it is. A numeric setting is a slider: grab the handle
+and drag it, or click anywhere on the track to jump there, and the value above it updates as
+you go. The scroll wheel still nudges a slider by one step, which is how you land on an exact
+number the track is too narrow to single out. Everything else is a click: a toggle flips, a mode
+cycles to the next option, a colour steps through the palette, and a key setting waits for the
+next key you press. Right clicking any setting puts it back to the value it shipped with.
+
 ## HUD modules
 
 These draw information on your screen. Each is a draggable element: open the click GUI and
@@ -21,6 +28,14 @@ resize the window.
 | Plains | The biome you are standing in | none |
 | MLGHelper | While sneaking, your fall height and a water-bucket cue | none |
 | ArrayList | The list of active modules, top right, sorted by width | Background on/off |
+| OnlineList | Everyone currently running Cryostasis, with their rank colour and status | Max Rows, Show Away, Show Status, Header |
+
+OnlineList is the presence roster: it lists the players whose clients are currently connected to
+the backend, whichever game server each of them is on, so it is not the same list as the server's
+own tab menu. A green square means they are playing, an amber one means their character has been
+parked long enough to count as away, and the text after the name is whatever status they set for
+themselves, or their state when they have set none. Somebody who has never signed in to the
+backend has no name this client trusts and is left off rather than shown as unknown.
 
 ## Movement
 
@@ -65,6 +80,7 @@ server still applies the slowdown, so use them with that in mind.
 | Nightvision | Keeps the world bright like the night vision potion and ignores darkness | none |
 | Freecam | Detaches the camera and flies it through anything, leaving your body behind | Speed, Range |
 | Freelook | Hold a key to look around without turning your body | Key, View |
+| StatusTag | Shows a Cryostasis player's rank and status under their name tag | Rank, Away, Status |
 
 Xray ships with a sensible default selection (the valuable ores plus containers, spawners,
 and vaults; coal and suspicious blocks are off to cut clutter). Toggle materials in the click
@@ -194,6 +210,33 @@ colour, and it is shown in the corner of the cosmetics menu. Default, Premium, E
 display ranks; Mod and Admin also carry the chat moderation commands above. Ranks are granted
 server-side and cannot be set from the client.
 
+## Presence and status
+
+The backend knows which clients are currently running, and works it out from a heartbeat rather
+than being told: your client says "still here" every thirty seconds, and each beat also says
+whether you have done anything in world since the last one. Three states fall out of that.
+
+- **Online.** Your client is beating and you have moved, looked, or pressed something recently.
+- **Away.** Your client is still beating, but nothing in world has happened for five minutes.
+  Menus do not count as activity, so reading your inventory long enough will show you as away,
+  which is the honest answer: your character is parked.
+- **Offline.** No heartbeat for two minutes. Nothing has to announce that you left, so a crash,
+  a lost connection and a clean quit all look the same and none of them leave you stuck online.
+
+On top of the state you can set a **status**, a short line of your own, in the cosmetics menu.
+The two are separate on purpose: the state is a fact about your client, the status is whatever
+you want to say. Where both exist, the status is what other people see.
+
+Your presence shows up in four places: the OnlineList HUD module, the roster beside the cosmetics
+menu, under a player's name tag in world (the StatusTag render module), and on global chat lines,
+where a sender who was away when they typed is tagged `[AFK]`. That last one is a snapshot taken
+when the line was posted rather than a live lookup, so it says what was true at the time and does
+not rewrite itself later.
+
+Presence is not tied to any module: the heartbeat runs whenever the client is signed in to the
+backend, the same as cosmetics and ranks. The modules above decide what you see, not what you
+report.
+
 ## Cosmetics
 
 Cosmetics are free for every account, so what the backend stores is not who owns what but who
@@ -212,10 +255,15 @@ reachable.
 ### Cosmetics menu
 
 Open it in world with Right Ctrl. It previews your own player, rotating to follow the cursor,
-and lists the catalogue. Click a row to toggle that cosmetic on or off:
-the preview updates at once and the change is saved to the backend in the background. Because
-the preview reuses the same renderer other players see, what you set here is what they see too.
-The menu needs a world to preview a player, so it only opens once you are in game.
+lists the catalogue, and carries the presence column on the right. Click a row to toggle that
+cosmetic on or off: the preview updates at once and the change is saved to the backend in the
+background. Because the preview reuses the same renderer other players see, what you set here is
+what they see too. The menu needs a world to preview a player, so it only opens once you are in
+game.
+
+The presence column is where you write your status. Type it into the field and press enter, or
+just close the menu, either sends it. Clearing the field clears your status. Below it is the same
+roster the OnlineList HUD shows, so you can see who is around without turning that module on.
 
 ## Opening the menu
 

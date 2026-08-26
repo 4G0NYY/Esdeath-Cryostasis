@@ -51,8 +51,23 @@ class Repo(Protocol):
 
     async def set_cape(self, uuid: str, cape: str) -> None: ...
 
-    async def touch(self, uuid: str) -> None:
-        """Heartbeat: record that the player was just seen (the addMe / online call)."""
+    async def touch(self, uuid: str, active: bool = False) -> None:
+        """Heartbeat: record that the player was just seen (the addMe / online call).
+
+        `active` additionally records that they did something, which is what separates an idle
+        client from a live one. It defaults to false so a caller written against the recovered
+        addMe contract, which carried no such flag, cannot silently claim activity.
+        """
+        ...
+
+    async def presence(self, window_seconds: int) -> list[Player]:
+        """Every player whose heartbeat is inside the window, whole records rather than UUIDs.
+
+        Distinct from online_players, which answers the recovered getOnlinePlayingPlayers with a
+        list of UUIDs and must keep doing so. The roster needs names, ranks and both presence
+        timestamps, and fetching those per UUID would be one query per player on the one call
+        that always touches every online row.
+        """
         ...
 
     async def add_cosmetic(self, uuid: str, slug: str) -> bool:

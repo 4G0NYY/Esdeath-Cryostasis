@@ -1,0 +1,591 @@
+/*
+ * The client's own palette, from gui/Theme.java. Kept as variables with the same names the mod
+ * uses so the site and the in-game menus cannot drift apart: a retheme is one edit in each.
+ */
+:root {
+  --bg-top: #0e1b2b;
+  --bg-bottom: #05090f;
+  --panel: #161f2c;
+  --panel-solid: #1a2433;
+  --header: #14202f;
+  --row: #121a25;
+  --row-hover: #1f2c3e;
+  --cell: #0b0f16;
+  --cell-border: #2a3648;
+  --accent: #5a8fc7;
+  --accent-dim: #2c4a63;
+  --text: #ffffff;
+  --subtext: #9aa7b8;
+
+  --online: #4cc77a;
+  --afk: #e8b14c;
+  --offline: #64748b;
+
+  --measure: 1120px;
+  --radius: 6px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-bottom);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+code,
+.mono {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 0;
+}
+
+.shell {
+  width: 100%;
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Header ------------------------------------------------------------------ */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(10, 17, 27, 0.82);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--cell-border);
+}
+
+.topbar .shell {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 60px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 650;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.brand svg {
+  display: block;
+}
+
+.topbar nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: 0.925rem;
+}
+
+.topbar nav a {
+  color: var(--subtext);
+}
+
+.topbar nav a:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* Buttons ----------------------------------------------------------------- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent-dim);
+  background: var(--row);
+  color: var(--text);
+  font-weight: 550;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.button:hover {
+  background: var(--row-hover);
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06121e;
+}
+
+.button.primary:hover {
+  background: #6d9fd4;
+  border-color: #6d9fd4;
+}
+
+/* Sections ---------------------------------------------------------------- */
+
+section {
+  padding: 84px 0;
+  border-top: 1px solid rgba(42, 54, 72, 0.55);
+}
+
+section:first-of-type {
+  border-top: none;
+}
+
+.eyebrow {
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.lede {
+  color: var(--subtext);
+  font-size: 1.05rem;
+  max-width: 62ch;
+  margin-top: 14px;
+}
+
+/* Hero -------------------------------------------------------------------- */
+
+.hero {
+  background:
+    radial-gradient(900px 420px at 12% -10%, rgba(90, 143, 199, 0.18), transparent 65%),
+    linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+  padding: 96px 0 88px;
+}
+
+.hero .shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 56px;
+  align-items: center;
+}
+
+.hero h1 {
+  font-size: clamp(2.4rem, 5.4vw, 3.6rem);
+  font-weight: 700;
+}
+
+.hero h1 .cold {
+  color: var(--accent);
+}
+
+.hero .lede {
+  font-size: 1.12rem;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.hero-meta {
+  margin-top: 22px;
+  color: var(--subtext);
+  font-size: 0.88rem;
+}
+
+/* The client menu mocked in markup rather than screenshotted: it stays sharp at any size,
+   costs no bytes in the image, and cannot go stale the way a picture of an old build does. */
+.mock {
+  border: 1px solid var(--cell-border);
+  border-radius: var(--radius);
+  background: var(--panel-solid);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  font-size: 0.82rem;
+}
+
+.mock-head {
+  background: var(--header);
+  border-bottom: 2px solid var(--accent);
+  padding: 8px 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.mock-body {
+  padding: 6px 0;
+}
+
+.mock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 12px;
+  border-left: 2px solid transparent;
+  color: var(--subtext);
+}
+
+.mock-row.on {
+  border-left-color: var(--accent);
+  color: var(--accent);
+  background: var(--row);
+}
+
+.mock-row .key {
+  color: var(--offline);
+  font-size: 0.76rem;
+}
+
+.mock-slider {
+  padding: 6px 12px 10px;
+  background: rgba(12, 18, 27, 0.7);
+}
+
+.mock-slider .label {
+  display: flex;
+  justify-content: space-between;
+  color: var(--subtext);
+  margin-bottom: 6px;
+}
+
+.mock-slider .label b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--cell);
+  border: 1px solid var(--cell-border);
+}
+
+.track .fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 3px 0 0 3px;
+  background: var(--accent-dim);
+}
+
+.track .handle {
+  position: absolute;
+  top: -4px;
+  width: 6px;
+  height: 12px;
+  margin-left: -3px;
+  border-radius: 2px;
+  background: var(--accent);
+  border: 1px solid var(--text);
+}
+
+/* Live panel -------------------------------------------------------------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.stat {
+  background: var(--panel);
+  border: 1px solid var(--cell-border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+
+.stat .value {
+  font-size: 1.9rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.stat .name {
+  color: var(--subtext);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+
+.stat.online .value {
+  color: var(--online);
+}
+
+.stat.afk .value {
+  color: var(--afk);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+
+.dot.online {
+  background: var(--online);
+}
+
+.dot.afk {
+  background: var(--afk);
+}
+
+.dot.offline {
+  background: var(--offline);
+}
+
+.roster {
+  margin-top: 20px;
+  border: 1px solid var(--cell-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.roster-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--row);
+  border-top: 1px solid rgba(42, 54, 72, 0.5);
+  font-size: 0.92rem;
+}
+
+.roster-row:first-child {
+  border-top: none;
+}
+
+.roster-row .who {
+  font-weight: 550;
+}
+
+.roster-row .rank {
+  font-size: 0.76rem;
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  opacity: 0.9;
+}
+
+.roster-row .status {
+  color: var(--subtext);
+  margin-left: auto;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note {
+  color: var(--subtext);
+  font-size: 0.86rem;
+  margin-top: 14px;
+}
+
+/* Feature grid ------------------------------------------------------------ */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 34px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--cell-border);
+  border-radius: var(--radius);
+  padding: 22px;
+}
+
+.card h3 {
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card .count {
+  margin-left: auto;
+  font-size: 0.76rem;
+  color: var(--subtext);
+  font-weight: 500;
+}
+
+.card p {
+  color: var(--subtext);
+  font-size: 0.93rem;
+  margin-top: 10px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.tag {
+  font-size: 0.76rem;
+  color: var(--subtext);
+  background: var(--cell);
+  border: 1px solid var(--cell-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+/* Install ----------------------------------------------------------------- */
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 34px;
+  counter-reset: step;
+}
+
+.step {
+  background: var(--panel);
+  border: 1px solid var(--cell-border);
+  border-radius: var(--radius);
+  padding: 22px;
+  position: relative;
+}
+
+.step h3 {
+  font-size: 1rem;
+  margin-bottom: 10px;
+}
+
+.step h3::before {
+  counter-increment: step;
+  content: counter(step);
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--text);
+  font-size: 0.78rem;
+  vertical-align: 2px;
+}
+
+.step p {
+  color: var(--subtext);
+  font-size: 0.93rem;
+}
+
+.step code {
+  color: var(--accent);
+  background: var(--cell);
+  border: 1px solid var(--cell-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+/* The honesty note, deliberately not styled as a warning banner: it is a fact about the
+   client, not a scare. */
+.caveat {
+  margin-top: 34px;
+  border: 1px solid var(--cell-border);
+  border-left: 3px solid var(--afk);
+  border-radius: var(--radius);
+  background: var(--row);
+  padding: 20px 24px;
+}
+
+.caveat p {
+  color: var(--subtext);
+  font-size: 0.95rem;
+}
+
+.caveat p + p {
+  margin-top: 10px;
+}
+
+/* Footer ------------------------------------------------------------------ */
+
+footer {
+  border-top: 1px solid var(--cell-border);
+  padding: 40px 0 56px;
+  color: var(--subtext);
+  font-size: 0.88rem;
+}
+
+footer .shell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  align-items: center;
+}
+
+footer nav {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+@media (max-width: 880px) {
+  .hero .shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+
+  section {
+    padding: 64px 0;
+  }
+
+  .topbar nav a.hide-sm {
+    display: none;
+  }
+}

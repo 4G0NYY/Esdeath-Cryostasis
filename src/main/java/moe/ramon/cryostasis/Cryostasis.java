@@ -2,6 +2,7 @@ package moe.ramon.cryostasis;
 
 import moe.ramon.cryostasis.backend.ApiClient;
 import moe.ramon.cryostasis.backend.ChatService;
+import moe.ramon.cryostasis.backend.PresenceService;
 import moe.ramon.cryostasis.backend.SessionService;
 import moe.ramon.cryostasis.config.ConfigManager;
 import moe.ramon.cryostasis.cosmetics.CosmeticService;
@@ -39,6 +40,7 @@ public final class Cryostasis {
 	private final SessionService sessionService = new SessionService(apiClient);
 	private final CosmeticService cosmeticService = new CosmeticService(apiClient, sessionService);
 	private final ChatService chatService = new ChatService(apiClient, sessionService);
+	private final PresenceService presenceService = new PresenceService(apiClient, sessionService);
 
 	Cryostasis() {
 		instance = this;
@@ -86,5 +88,9 @@ public final class Cryostasis {
 
 	public ChatService getChatService() {
 		return chatService;
+	}
+
+	public PresenceService getPresenceService() {
+		return presenceService;
 	}
 }

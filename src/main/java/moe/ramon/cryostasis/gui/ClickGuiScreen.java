@@ -24,16 +24,29 @@ import java.util.Set;
 /**
  * The module configuration menu. One draggable panel per category; each panel lists its
  * modules. Left click toggles a module, right click expands its settings. Settings edit
- * inline: booleans toggle, modes cycle, numbers respond to scroll, keybinds capture the
- * next key, colors cycle a small preset palette.
+ * inline: booleans toggle, modes cycle, numbers ride a slider the mouse drags, keybinds
+ * capture the next key, colors cycle a small preset palette. Right clicking any setting
+ * restores the value it shipped with.
  *
- * Layout math is intentionally simple and computed per frame; a config menu is not a hot
- * path, so clarity beats caching here.
+ * Every row a panel can draw is produced once by {@link Panel#layout()}, and rendering, hit
+ * testing, dragging, and scrolling all walk that same list. The three used to recompute the
+ * running y themselves and had to be kept in step by hand, which was survivable while every
+ * row was one height and stopped being so the moment sliders became taller than the rest.
  */
 public final class ClickGuiScreen extends Screen {
-	private static final int PANEL_WIDTH = 96;
+	private static final int PANEL_WIDTH = 112;
 	private static final int ROW_HEIGHT = 13;
+	private static final int SLIDER_HEIGHT = 21;
 	private static final int HEADER_HEIGHT = 14;
+
+	/** Horizontal inset of a slider track from the panel edge. */
+	private static final int TRACK_INSET = 7;
+	private static final int TRACK_HEIGHT = 4;
+	/** Distance from the top of a slider row down to the top of its track. */
+	private static final int TRACK_OFFSET = 13;
+	private static final int HANDLE_WIDTH = 4;
+	/** How far the handle stands proud of the track, above and below. */
+	private static final int HANDLE_GROW = 3;
 
 	private static final int COLOR_HEADER = Theme.HEADER;
 	private static final int COLOR_PANEL = Theme.ROW;
@@ -58,6 +71,13 @@ public final class ClickGuiScreen extends Screen {
 	private int dragOffsetY;
 	private KeybindSetting bindingCapture;
 	private Module bindingModule;
+
+	// The slider the mouse is currently holding, and the track it was grabbed on. The track is
+	// captured rather than looked up per drag event so a slider keeps following the cursor once
+	// grabbed, even when the pointer leaves the panel.
+	private NumberSetting slider;
+	private int sliderTrackX;
+	private int sliderTrackWidth;
 
 	public ClickGuiScreen() {
 		super(Component.literal("Cryostasis"));
@@ -123,11 +143,16 @@ public final class ClickGuiScreen extends Screen {
 	@Override
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
 		dragging = null;
+		slider = null;
 		return super.mouseReleased(mouseX, mouseY, button);
 	}
 
 	@Override
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+		if (slider != null) {
+			slideTo(slider, mouseX, sliderTrackX, sliderTrackWidth);
+			return true;
+		}
 		if (dragging != null) {
 			dragging.x = (int) mouseX - dragOffsetX;
 			dragging.y = (int) mouseY - dragOffsetY;
@@ -169,7 +194,23 @@ public final class ClickGuiScreen extends Screen {
 		super.onClose();
 	}
 
+	/** Move a slider to wherever along its track the cursor is, clamped to the ends. */
+	private static void slideTo(NumberSetting number, double mouseX, int trackX, int trackWidth) {
+		double fraction = Math.max(0.0, Math.min(1.0, (mouseX - trackX) / trackWidth));
+		number.set(number.getMin() + fraction * (number.getMax() - number.getMin()));
+	}
+
+	/** Where along its track a value sits, as 0..1. A zero-width range pins to the left. */
+	private static double fractionOf(NumberSetting number) {
+		double span = number.getMax() - number.getMin();
+		return span <= 0.0 ? 0.0 : (number.get() - number.getMin()) / span;
+	}
+
 	private void clickSetting(Setting<?> setting, int button) {
+		if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+			setting.reset();
+			return;
+		}
 		if (setting instanceof BooleanSetting bool) {
 			bool.toggle();
 		} else if (setting instanceof ModeSetting mode) {
@@ -198,17 +239,13 @@ public final class ClickGuiScreen extends Screen {
 			return setting.getName() + ": " + (bool.get() ? "on" : "off");
 		} else if (setting instanceof ModeSetting mode) {
 			return setting.getName() + ": " + mode.get();
-		} else if (setting instanceof NumberSetting number) {
-			return setting.getName() + ": " + trim(number.get());
 		} else if (setting instanceof KeybindSetting keybind) {
 			return setting.getName() + ": " + keyName(keybind.get());
-		} else if (setting instanceof ColorSetting) {
-			return setting.getName();
 		}
 		return setting.getName();
 	}
 
-	private static String trim(double value) {
+	static String trim(double value) {
 		if (value == Math.rint(value)) {
 			return Integer.toString((int) value);
 		}
@@ -225,6 +262,20 @@ public final class ClickGuiScreen extends Screen {
 			return "none";
 		}
 		return InputConstants.Type.KEYSYM.getOrCreate(key).getDisplayName().getString().toUpperCase();
+	}
+
+	/** What a panel draws at one vertical position. */
+	private enum Kind {
+		MODULE,
+		/** The module's own toggle key, drawn first under an expanded module. */
+		BIND,
+		SETTING
+	}
+
+	private record Row(Kind kind, Module module, Setting<?> setting, int y, int height) {
+		boolean contains(double my) {
+			return my >= y && my < y + height;
+		}
 	}
 
 	/** A single category column. */
@@ -249,105 +300,180 @@ public final class ClickGuiScreen extends Screen {
 			return mx >= x && mx <= x + PANEL_WIDTH && my >= y && my <= y + HEADER_HEIGHT;
 		}
 
+		private boolean inColumn(double mx) {
+			return mx >= x && mx <= x + PANEL_WIDTH;
+		}
+
+		private int trackX() {
+			return x + TRACK_INSET;
+		}
+
+		private int trackWidth() {
+			return PANEL_WIDTH - TRACK_INSET * 2;
+		}
+
+		/**
+		 * Every row this panel currently shows, top to bottom. The single source of truth for
+		 * where a row sits, so a change to any row's height is picked up by drawing and by hit
+		 * testing at once.
+		 */
+		private List<Row> layout() {
+			List<Row> rows = new ArrayList<>();
+			if (collapsed) {
+				return rows;
+			}
+			int rowY = y + HEADER_HEIGHT;
+			for (Module module : modules()) {
+				rows.add(new Row(Kind.MODULE, module, null, rowY, ROW_HEIGHT));
+				rowY += ROW_HEIGHT;
+				if (!expanded.contains(module)) {
+					continue;
+				}
+				rows.add(new Row(Kind.BIND, module, null, rowY, ROW_HEIGHT));
+				rowY += ROW_HEIGHT;
+				for (Setting<?> setting : module.getSettings()) {
+					int height = setting instanceof NumberSetting ? SLIDER_HEIGHT : ROW_HEIGHT;
+					rows.add(new Row(Kind.SETTING, module, setting, rowY, height));
+					rowY += height;
+				}
+			}
+			return rows;
+		}
+
 		void render(ClickGuiScreen screen, GuiGraphics context, int mouseX, int mouseY) {
 			Font font = screen.font;
 			context.fill(x, y, x + PANEL_WIDTH, y + HEADER_HEIGHT, COLOR_HEADER);
 			// Accent underline on the header, echoing the title screen's panel seam.
 			context.fill(x, y + HEADER_HEIGHT - 1, x + PANEL_WIDTH, y + HEADER_HEIGHT, Theme.ACCENT);
 			context.drawString(font, category.getDisplayName(), x + 4, y + 3, COLOR_TEXT);
-			if (collapsed) {
-				return;
-			}
-			int rowY = y + HEADER_HEIGHT;
-			for (Module module : modules()) {
-				boolean hovered = mouseX >= x && mouseX <= x + PANEL_WIDTH && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT;
-				context.fill(x, rowY, x + PANEL_WIDTH, rowY + ROW_HEIGHT, hovered ? Theme.ROW_HOVER : COLOR_PANEL);
-				// A left accent stripe marks the enabled modules at a glance.
-				if (module.isEnabled()) {
-					context.fill(x, rowY, x + 2, rowY + ROW_HEIGHT, Theme.ACCENT);
-				}
-				int color = module.isEnabled() ? COLOR_ENABLED : COLOR_TEXT;
-				context.drawString(font, module.getName(), x + 6, rowY + 3, color);
-				// Show the toggle key on the row so a bind is visible at a glance.
-				if (module.hasKeybind()) {
-					String key = keyName(module.getKeyCode());
-					context.drawString(font, key, x + PANEL_WIDTH - font.width(key) - 4, rowY + 3, COLOR_SUBTEXT);
-				}
-				rowY += ROW_HEIGHT;
 
-				if (expanded.contains(module)) {
-					// Toggle-key bind row, first under the module so it is easy to find.
-					context.fill(x, rowY, x + PANEL_WIDTH, rowY + ROW_HEIGHT, Theme.SETTING_ROW);
-					int bindColor = screen.bindingModule == module ? Theme.ACCENT : COLOR_SUBTEXT;
-					context.drawString(font, "Bind: " + keyName(module.getKeyCode()), x + 8, rowY + 3, bindColor);
-					rowY += ROW_HEIGHT;
-
-					for (Setting<?> setting : module.getSettings()) {
-						context.fill(x, rowY, x + PANEL_WIDTH, rowY + ROW_HEIGHT, Theme.SETTING_ROW);
-						int settingColor = screen.bindingCapture == setting ? Theme.ACCENT : COLOR_SUBTEXT;
-						context.drawString(font, describe(setting), x + 8, rowY + 3, settingColor);
-						rowY += ROW_HEIGHT;
+			for (Row row : layout()) {
+				boolean hovered = inColumn(mouseX) && row.contains(mouseY);
+				switch (row.kind()) {
+					case MODULE -> renderModule(context, font, row, hovered);
+					case BIND -> {
+						context.fill(x, row.y(), x + PANEL_WIDTH, row.y() + row.height(), Theme.SETTING_ROW);
+						int color = screen.bindingModule == row.module() ? Theme.ACCENT : COLOR_SUBTEXT;
+						context.drawString(font, "Bind: " + keyName(row.module().getKeyCode()),
+								x + 8, row.y() + 3, color);
 					}
+					case SETTING -> renderSetting(screen, context, font, row, hovered, mouseX);
 				}
 			}
 		}
 
+		private void renderModule(GuiGraphics context, Font font, Row row, boolean hovered) {
+			Module module = row.module();
+			context.fill(x, row.y(), x + PANEL_WIDTH, row.y() + row.height(),
+					hovered ? Theme.ROW_HOVER : COLOR_PANEL);
+			// A left accent stripe marks the enabled modules at a glance.
+			if (module.isEnabled()) {
+				context.fill(x, row.y(), x + 2, row.y() + row.height(), Theme.ACCENT);
+			}
+			context.drawString(font, module.getName(), x + 6, row.y() + 3,
+					module.isEnabled() ? COLOR_ENABLED : COLOR_TEXT);
+			// Show the toggle key on the row so a bind is visible at a glance.
+			if (module.hasKeybind()) {
+				String key = keyName(module.getKeyCode());
+				context.drawString(font, key, x + PANEL_WIDTH - font.width(key) - 4, row.y() + 3, COLOR_SUBTEXT);
+			}
+		}
+
+		private void renderSetting(ClickGuiScreen screen, GuiGraphics context, Font font, Row row,
+				boolean hovered, int mouseX) {
+			Setting<?> setting = row.setting();
+			context.fill(x, row.y(), x + PANEL_WIDTH, row.y() + row.height(),
+					hovered ? Theme.ROW_HOVER : Theme.SETTING_ROW);
+
+			if (setting instanceof NumberSetting number) {
+				renderSlider(screen, context, font, number, row, hovered, mouseX);
+				return;
+			}
+			int color = screen.bindingCapture == setting ? Theme.ACCENT : COLOR_SUBTEXT;
+			context.drawString(font, describe(setting), x + 8, row.y() + 3, color);
+			// A colour is the one value whose name says nothing about it, so the row carries a
+			// swatch of what it is actually set to.
+			if (setting instanceof ColorSetting swatch) {
+				Skin.plate(context, x + PANEL_WIDTH - 14, row.y() + 3, 10, 7,
+						swatch.get(), Theme.CELL_BORDER);
+			}
+		}
+
+		private void renderSlider(ClickGuiScreen screen, GuiGraphics context, Font font,
+				NumberSetting number, Row row, boolean hovered, int mouseX) {
+			context.drawString(font, number.getName(), x + 7, row.y() + 2, COLOR_SUBTEXT);
+			String value = trim(number.get());
+			context.drawString(font, value, x + PANEL_WIDTH - font.width(value) - 7, row.y() + 2,
+					Theme.ACCENT);
+
+			int trackX = trackX();
+			int trackWidth = trackWidth();
+			int trackY = row.y() + TRACK_OFFSET;
+			Skin.plate(context, trackX, trackY, trackWidth, TRACK_HEIGHT, Theme.CELL, Theme.CELL_BORDER);
+
+			int filled = (int) Math.round(fractionOf(number) * trackWidth);
+			if (filled > 0) {
+				context.fill(trackX, trackY, trackX + filled, trackY + TRACK_HEIGHT, Theme.ACCENT_DIM);
+			}
+
+			// The handle is kept inside the track at both ends, so the maximum reads as full
+			// rather than as a handle hanging off the right edge.
+			boolean active = screen.slider == number
+					|| (hovered && mouseX >= trackX - HANDLE_WIDTH && mouseX <= trackX + trackWidth + HANDLE_WIDTH);
+			int handleX = trackX + Math.min(filled, trackWidth - HANDLE_WIDTH);
+			Skin.plate(context, handleX, trackY - HANDLE_GROW, HANDLE_WIDTH, TRACK_HEIGHT + HANDLE_GROW * 2,
+					active ? Theme.ACCENT : Theme.ACCENT_DIM, active ? Theme.TEXT : Theme.ACCENT);
+		}
+
 		boolean handleClick(ClickGuiScreen screen, double mx, double my, int button) {
-			if (mx < x || mx > x + PANEL_WIDTH) {
+			if (!inColumn(mx)) {
 				return false;
 			}
-			int rowY = y + HEADER_HEIGHT;
-			for (Module module : modules()) {
-				if (my >= rowY && my <= rowY + ROW_HEIGHT) {
-					if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-						module.toggle();
-					} else if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
-						if (expanded.contains(module)) {
-							expanded.remove(module);
+			for (Row row : layout()) {
+				if (!row.contains(my)) {
+					continue;
+				}
+				switch (row.kind()) {
+					case MODULE -> {
+						if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+							row.module().toggle();
+						} else if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+							if (!expanded.remove(row.module())) {
+								expanded.add(row.module());
+							}
+						}
+					}
+					// Clicking it starts key capture for this module's toggle.
+					case BIND -> screen.bindingModule = row.module();
+					case SETTING -> {
+						if (row.setting() instanceof NumberSetting number
+								&& button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+							// Grab the slider and jump to the click, so a click anywhere on the
+							// track sets the value and the same gesture continues as a drag.
+							screen.slider = number;
+							screen.sliderTrackX = trackX();
+							screen.sliderTrackWidth = trackWidth();
+							slideTo(number, mx, screen.sliderTrackX, screen.sliderTrackWidth);
 						} else {
-							expanded.add(module);
+							screen.clickSetting(row.setting(), button);
 						}
 					}
-					return true;
 				}
-				rowY += ROW_HEIGHT;
-				if (expanded.contains(module)) {
-					// Bind row: clicking it starts key capture for this module's toggle.
-					if (my >= rowY && my <= rowY + ROW_HEIGHT) {
-						screen.bindingModule = module;
-						return true;
-					}
-					rowY += ROW_HEIGHT;
-
-					for (Setting<?> setting : module.getSettings()) {
-						if (my >= rowY && my <= rowY + ROW_HEIGHT) {
-							screen.clickSetting(setting, button);
-							return true;
-						}
-						rowY += ROW_HEIGHT;
-					}
-				}
+				return true;
 			}
 			return false;
 		}
 
 		boolean handleScroll(double mx, double my, double vertical) {
-			if (mx < x || mx > x + PANEL_WIDTH || vertical == 0) {
+			if (!inColumn(mx) || vertical == 0) {
 				return false;
 			}
-			int rowY = y + HEADER_HEIGHT;
-			for (Module module : modules()) {
-				rowY += ROW_HEIGHT;
-				if (expanded.contains(module)) {
-					// Skip the bind row that render and handleClick draw before the settings.
-					rowY += ROW_HEIGHT;
-					for (Setting<?> setting : module.getSettings()) {
-						if (my >= rowY && my <= rowY + ROW_HEIGHT && setting instanceof NumberSetting number) {
-							number.set(number.get() + Math.signum(vertical) * number.getStep());
-							return true;
-						}
-						rowY += ROW_HEIGHT;
-					}
+			for (Row row : layout()) {
+				if (row.contains(my) && row.setting() instanceof NumberSetting number) {
+					// The wheel still nudges by one step, which is the only way to land on an
+					// exact value the track is too short to single out.
+					number.set(number.get() + Math.signum(vertical) * number.getStep());
+					return true;
 				}
 			}
 			return false;

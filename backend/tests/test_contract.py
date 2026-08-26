@@ -85,8 +85,13 @@ async def test_cape_roundtrip(client, uuid):
 
 
 async def test_status_roundtrip(client, uuid):
-    assert (await client.put(f"/api/players/{uuid}/status", json={"status": "afk"})).status_code == 204
-    assert (await client.get(f"/api/players/{uuid}/status")).json() == {"status": "afk"}
+    # `status` is the contract field the recovered getTheStatusOfThePlayer returned and stays the
+    # free text a player sets; the derived presence fields beside it are additive, so a caller
+    # written against the recovered shape still reads the same value out of the same key.
+    assert (await client.put(f"/api/players/{uuid}/status", json={"status": "at the anvil"})).status_code == 204
+    body = (await client.get(f"/api/players/{uuid}/status")).json()
+    assert body["status"] == "at the anvil"
+    assert body["state"] == "offline"
 
 
 async def test_rank_default(client, uuid):

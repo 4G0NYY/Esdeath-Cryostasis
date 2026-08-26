@@ -90,6 +90,14 @@ public final class ApiClient {
 		return send(request);
 	}
 
+	public CompletableFuture<HttpResponse<String>> put(String path, JsonObject body) {
+		HttpRequest request = request(path, DEFAULT_TIMEOUT)
+				.header("Content-Type", "application/json")
+				.PUT(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8))
+				.build();
+		return send(request);
+	}
+
 	public CompletableFuture<HttpResponse<String>> delete(String path) {
 		return send(request(path, DEFAULT_TIMEOUT).DELETE().build());
 	}

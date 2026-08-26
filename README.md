@@ -23,13 +23,14 @@ No Minecraft code lives in this repository. The build ships as a Fabric mod jar 
 - Phase 1 (mod skeleton and framework): done. Module manager, settings, versioned JSON
   config, keybind and input layer, internal event bus, click GUI, and a HUD engine with
   anchored, draggable elements.
-- Phase 2 (modules): done, and past the original spec. Forty-two modules across six
+- Phase 2 (modules): done, and past the original spec. Forty-four modules across six
   categories.
-  - HUD: FPS, CPS, XYZ, ReachDisplay, PingTag, Plains, MLGHelper, ArrayList, Rainbow.
+  - HUD: FPS, CPS, XYZ, ReachDisplay, PingTag, Plains, MLGHelper, ArrayList, Rainbow,
+    OnlineList.
   - Movement: ToggleSprint, SafeWalk, AutoPath, Zoot, Spider, Jesus, NoCobweb, NoSoulsand,
     Fly.
   - Render: Hitbox, BlockOutline, Zoom, CleanChat, Xray, NoBlind, Nightvision, Freecam,
-    Freelook.
+    Freelook, StatusTag.
   - Combat: MoreParticles, Sharpness, Killaura, AutoDodge, Reach.
   - Player: AutoTool, AutoEquip, AutoTotem, FastBreak, NoHunger.
   - Misc: AutoText, TakeAll, TabGui, DiscordPresence, GlobalChat.
@@ -38,7 +39,10 @@ No Minecraft code lives in this repository. The build ships as a Fabric mod jar 
   decompilation: Connector, MotionBlur, ItemAnimation.
 - Phase 3 (cosmetics backend): done, and hosted. `backend/` implements the full REST
   contract and runs at `cryostasis.ramon.moe` behind the session-proof handshake. Beyond
-  cosmetics and presence it now serves ranks and a Cryostasis-wide global chat.
+  cosmetics it now serves ranks, a Cryostasis-wide global chat, and derived presence:
+  online, away and offline are worked out from each client's heartbeat rather than stored,
+  so nothing has to announce that a player left. The same service serves the public site at
+  the root of that domain, which reads its live roster from the API beneath it.
 - Phase 4 (cosmetics rendering): framework done. The backend-driven cosmetic layer is
   wired onto the player renderer, with the TopHat, Halo, and Bandana models rebuilt, and
   the in-game menu reads the catalogue from the backend. Visual correctness still needs a

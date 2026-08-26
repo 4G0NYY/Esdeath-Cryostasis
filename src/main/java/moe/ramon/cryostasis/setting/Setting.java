@@ -12,15 +12,26 @@ import com.google.gson.JsonElement;
  */
 public abstract class Setting<T> {
 	private final String name;
+	private final T defaultValue;
 	protected T value;
 
 	protected Setting(String name, T defaultValue) {
 		this.name = name;
+		this.defaultValue = defaultValue;
 		this.value = defaultValue;
 	}
 
 	public String getName() {
 		return name;
+	}
+
+	public T getDefault() {
+		return defaultValue;
+	}
+
+	/** Restore the value this setting shipped with. The GUI offers it as right click. */
+	public void reset() {
+		set(defaultValue);
 	}
 
 	public T get() {

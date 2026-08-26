@@ -1,0 +1,122 @@
+package moe.ramon.cryostasis.modules.hud;
+
+import moe.ramon.cryostasis.Cryostasis;
+import moe.ramon.cryostasis.backend.PresenceService;
+import moe.ramon.cryostasis.gui.Theme;
+import moe.ramon.cryostasis.hud.HudModule;
+import moe.ramon.cryostasis.setting.BooleanSetting;
+import moe.ramon.cryostasis.setting.NumberSetting;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Who else is running Cryostasis right now, whichever server they are on.
+ *
+ * The roster comes from the backend's presence endpoint, which derives each state from that
+ * client's heartbeat rather than storing it, so a player who quits drops off on their own and one
+ * who has stopped touching anything is shown away rather than gone. A dot carries the state and
+ * the name carries the rank colour, which is the same palette the backend stamps onto chat lines.
+ *
+ * Nothing here fetches: {@link PresenceService} polls off-thread and this reads its last answer,
+ * so a slow backend costs a stale list rather than a stutter.
+ */
+public final class OnlineListModule extends HudModule {
+	private static final int DOT_WIDTH = 6;
+	private static final int GAP = 4;
+	private static final int PAD = 3;
+	private static final int BACKGROUND = 0x900A111B;
+
+	private static final int COLOR_ONLINE = 0xFF4CC77A;
+	private static final int COLOR_AWAY = 0xFFE8B14C;
+
+	private final NumberSetting maxRows = register(new NumberSetting("Max Rows", 8, 1, 20, 1));
+	private final BooleanSetting showAway = register(new BooleanSetting("Show Away", true));
+	private final BooleanSetting showStatus = register(new BooleanSetting("Show Status", true));
+	private final BooleanSetting showHeader = register(new BooleanSetting("Header", true));
+
+	private final List<PresenceService.Entry> shown = new ArrayList<>();
+
+	public OnlineListModule() {
+		// Top right by default, under where the ArrayList lays itself out.
+		super("OnlineList", "Lists everyone currently on the client.", 1.0, 0.35);
+	}
+
+	@Override
+	public boolean isAutoStacked() {
+		// It sizes itself from its content and wants its own corner, like the ArrayList.
+		return false;
+	}
+
+	@Override
+	public void render(GuiGraphics context, float tickDelta) {
+		Font font = mc.font;
+		PresenceService presence = Cryostasis.get().getPresenceService();
+
+		shown.clear();
+		for (PresenceService.Entry entry : presence.roster()) {
+			if (entry.username().isBlank()) {
+				// A player who has never completed the session handshake has no name the backend
+				// trusts, and a row reading "unknown" is worse than no row.
+				continue;
+			}
+			if (!showAway.get() && entry.isAfk()) {
+				continue;
+			}
+			if (shown.size() >= maxRows.getInt()) {
+				break;
+			}
+			shown.add(entry);
+		}
+
+		String header = presence.onlineCount() + " online, " + presence.awayCount() + " away";
+		int lineHeight = font.lineHeight + 1;
+		int rows = shown.size() + (showHeader.get() ? 1 : 0);
+		if (rows == 0) {
+			setBounds(context.guiWidth(), 0, 0, 0);
+			return;
+		}
+
+		int widest = showHeader.get() ? font.width(header) : 0;
+		for (PresenceService.Entry entry : shown) {
+			widest = Math.max(widest, DOT_WIDTH + GAP + font.width(line(entry)));
+		}
+
+		int blockHeight = lineHeight * rows;
+		int x = resolveX(context.guiWidth(), widest);
+		int y = resolveY(context.guiHeight(), blockHeight);
+
+		context.fill(x - PAD, y - 1, x + widest + PAD, y + blockHeight, BACKGROUND);
+
+		int cursor = y;
+		if (showHeader.get()) {
+			context.drawString(font, header, x, cursor, Theme.SUBTEXT);
+			cursor += lineHeight;
+		}
+		for (PresenceService.Entry entry : shown) {
+			// A filled square rather than a glyph: it reads as a state light at every GUI scale
+			// and needs no font that has a dot in it.
+			int dot = entry.isOnline() ? COLOR_ONLINE : COLOR_AWAY;
+			context.fill(x, cursor + 2, x + DOT_WIDTH - 2, cursor + font.lineHeight - 1, dot);
+			context.drawString(font, line(entry), x + DOT_WIDTH + GAP, cursor, entry.color());
+			cursor += lineHeight;
+		}
+
+		setBounds(x - PAD, y - 1, widest + PAD * 2, blockHeight + 1);
+	}
+
+	private String line(PresenceService.Entry entry) {
+		if (!showStatus.get()) {
+			return entry.username();
+		}
+		return entry.username() + " " + entry.label();
+	}
+
+	@Override
+	public String getHudLabel() {
+		PresenceService presence = Cryostasis.get().getPresenceService();
+		return getName() + " " + (presence.onlineCount() + presence.awayCount());
+	}
+}

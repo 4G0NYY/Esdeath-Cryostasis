@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # rather than stored, so a crashed client goes offline on its own (architecture 6).
     presence_window_seconds: int = 120
 
+    # A connected player who has not touched anything for this long reads as AFK rather than
+    # online. Much larger than the presence window on purpose: the window asks whether the
+    # client is still there, which a lost connection answers in seconds, while this asks whether
+    # the player is, which nobody answers by stepping away from the keyboard for two minutes.
+    afk_after_seconds: int = 300
+
     # Object storage: the database holds only a key, the API returns a CDN URL built from
     # this base, and texture bytes never pass through this service (architecture 7).
     cdn_base_url: str = "https://cdn.cryostasis.ramon.moe"
@@ -58,6 +64,12 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 120
 
     cosmetics_cache_seconds: int = 30
+
+    # The built public site, mounted at the root by app/web.py. Relative to the working
+    # directory, which is the repository's backend/ in development and /app in the container, so
+    # one value covers both. An absent directory disables the mount rather than failing the boot,
+    # since a source checkout has no bundle until the frontend is built.
+    site_dir: str = "web/dist"
 
     # Grants the admin surface, which today is only "set a player's rank". Empty disables that
     # surface outright rather than falling back to some weaker check, so a deployment that

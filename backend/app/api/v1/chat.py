@@ -37,6 +37,7 @@ from app.domain.models import (
     MuteBody,
     normalize_uuid,
     now,
+    presence_view,
     resolve_rank,
 )
 from app.repo.base import Repo
@@ -127,6 +128,17 @@ async def post_chat(
     username = player.username or (body.username or "").strip() or "Player"
     rank = resolve_rank(player.rank)
 
+    # Posting proves the client is alive, so it counts as a heartbeat, but it is not in-world
+    # activity and so does not clear AFK. That is what makes the stamped state worth reading: it
+    # says whether the sender's character was parked while they typed, which on a channel
+    # spanning many game servers is the difference between someone playing and someone watching.
+    await repo.touch(uuid)
+    state = presence_view(
+        player.model_copy(update={"last_seen": now()}),
+        settings.presence_window_seconds,
+        settings.afk_after_seconds,
+    ).state
+
     stored = await repo.post_chat(
         ChatMessage(
             id=0,  # assigned by the store; the log's id is the poll cursor
@@ -135,6 +147,7 @@ async def post_chat(
             rank=rank.name,
             color=rank.color,
             message=body.message,
+            state=state,
             at=now(),
         )
     )

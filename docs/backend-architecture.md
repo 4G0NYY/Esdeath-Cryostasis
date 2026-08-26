@@ -20,7 +20,7 @@ auth off, which is the mode the client is smoke-tested against.
   answered by work that has since landed rather than by dropping the feature. The session proof
   (section 4) means a sender is an account Mojang authenticated, so there is no anonymous
   posting and no posting as someone else; ranks (section 4a) give a staff tier the mute and
-  delete calls to act with. Section 12 has the delivery design.
+  delete calls to act with. Section 13 has the delivery design.
 - **Hosting is undecided.** The service targets plain Docker plus `DATABASE_URL`, so it runs
   anywhere and the choice can be made at deploy time.
 
@@ -111,10 +111,10 @@ Postgres, keyed by Minecraft UUID.
 
 | Table | Columns | Notes |
 |---|---|---|
-| `players` | `uuid` PK, `username`, `rank`, `status`, `last_seen`, `cape`, `updated_at` | `rank` is a display tag plus a staff flag, since it no longer gates cape rarity. `username` is written by the session proof, never by a request body |
+| `players` | `uuid` PK, `username`, `rank`, `status`, `server`, `last_seen`, `last_active`, `cape`, `updated_at` | `rank` is a display tag plus a staff flag, since it no longer gates cape rarity. `username` is written by the session proof, never by a request body. The two timestamps are presence: one says the client is there, the other says the player is (section 6) |
 | `cosmetics` | `slug` PK, `kind`, `rarity`, `texture_key`, `model` | The catalogue. Seeded from a file and effectively read-only at runtime |
 | `player_cosmetics` | `player_uuid` FK, `cosmetic_slug` FK, PK on both | The active set, not an ownership record |
-| `chat_messages` | `id` PK (bigserial), `player_uuid`, `username`, `rank`, `color`, `message`, `created_at` | The global channel. `id` is the poll cursor; sender fields are a snapshot taken at post time |
+| `chat_messages` | `id` PK (bigserial), `player_uuid`, `username`, `rank`, `color`, `message`, `state`, `created_at` | The global channel. `id` is the poll cursor; sender fields, `state` among them, are a snapshot taken at post time |
 | `chat_mutes` | `player_uuid` PK, `username`, `until`, `reason`, `by_uuid` | An expiry, not a flag, so a mute lapses without a sweeper |
 
 Cape stays its own column rather than a row in `player_cosmetics`, for two reasons: the
@@ -126,14 +126,39 @@ modeled cosmetics as a set and did the same.
 
 ## 6. Presence without Redis
 
-Presence is a `last_seen` timestamp on `players`; online is derived as
-`last_seen > now() - interval`. The old `addMe` and `ImOnServer` had no way to notice a
-crashed client, so "online" drifted permanently. A heartbeat with a derived window makes
-offline the default and needs no sweeper job.
+Presence is two timestamps on `players`, and every state is derived from them. `last_seen` is
+written by every heartbeat, and online is `last_seen > now() - interval`. The old `addMe` and
+`ImOnServer` had no way to notice a crashed client, so "online" drifted permanently. A heartbeat
+with a derived window makes offline the default and needs no sweeper job.
+
+`last_active` is the second timestamp, and it is what makes "away" possible at all. A heartbeat
+alone cannot distinguish a player who is standing still from one who has walked off, because both
+send the same beat, so the beat carries a flag: `active: true` means the player did something in
+world since the last one, and only then is `last_active` written. Away is then `last_seen` fresh
+and `last_active` stale, which needs no extra state and no timer of its own.
+
+Deciding it here rather than on the client is what keeps it consistent. The threshold is one
+config value, so every client agrees on what away means and a modified client cannot claim to be
+online while doing nothing; all it can do is lie about a single beat, which the next honest one
+corrects. The client's only job is to answer "did anything happen", which is the one question it
+alone can answer.
+
+A player who has never reported activity reads as away rather than online. There is nothing on
+such a record saying they were ever at the keyboard, and a client written against the recovered
+bodyless `addMe` is exactly that case: it stays away forever, which is the honest answer for a
+caller with no way to say otherwise.
+
+Two read paths, deliberately not one. `GET /players/online` still answers the recovered
+`getOnlinePlayingPlayers` with a bare list of UUIDs, because the shipped client parses it.
+`GET /players/presence` is the roster and carries whole records, since the surfaces that draw one
+need a name, a rank colour and a state per row and fetching those per UUID would be a query per
+player on the one call that always touches every online row. `POST /players/presence/batch`
+answers for a named set including offline players, for the name tag and chat surfaces, which
+already know which players are in front of them.
 
 This is deliberately **not** Redis. A presence window is one indexed query, and the response
 cache it would also serve is an ETag the client already honours. Chat's return did put the one
-genuine pub/sub case back on the table, and section 12 takes the polled-log route instead for the
+genuine pub/sub case back on the table, and section 13 takes the polled-log route instead for the
 same reason: at this traffic Redis is a container to run, back up and debug for a latency
 improvement nothing here needs. The swap stays contained in `repo/`.
 
@@ -169,10 +194,15 @@ Against `docs/backend-api.md`:
   check and always returns true for a real cosmetic. Kept only for contract compatibility.
 - Chat endpoints are ported, but not in the shape that document guessed: `GET /chat` is a
   cursor-and-long-poll read returning a list, not a single latest message with client-side
-  dedup (section 12).
+  dedup (section 13).
 - `GET /players/{uuid}/rank` gains `color` and `staff` alongside the unchanged `rank`, so the
   addition is backward compatible for anything parsing the recovered shape.
 - New: a batch active-cosmetics endpoint (section 8).
+- `POST /players/{uuid}/online` takes an optional body carrying the activity flag and the server.
+  The recovered `addMe` had no body, so a caller written against it still beats correctly.
+- `GET /players/{uuid}/status` gains the derived state and the presence timestamps alongside the
+  unchanged `status`, so the addition is backward compatible.
+- New: `GET /players/presence` and `POST /players/presence/batch` (section 6).
 - New: `POST /auth/session` and the nonce exchange (section 4).
 - New: `GET /ranks` and the admin-only `PUT /players/{uuid}/rank` (section 4a).
 - New: the chat moderation routes, which the original protocol had no equivalent of at all.
@@ -197,14 +227,32 @@ client needs. This keeps the shipped client working with no alias to maintain.
 
 - Microsoft OAuth device-code flow (Phase 5, for the alt account manager only).
 - Redis. It would buy a push channel for chat and a cluster-wide rate limit; neither is worth a
-  stateful dependency at this traffic, and the polled log (section 12) was designed so that
+  stateful dependency at this traffic, and the polled log (section 13) was designed so that
   swapping to a push transport later changes only the read endpoint.
 - Chat history beyond a day, and any search over it. The channel is live, not an archive.
 - A cosmetics admin surface. With cosmetics free and the catalogue seeded from a file, there
   is nothing per-player to administer yet. Ranks needed one and got the narrowest possible
   version: a single token-guarded route (section 4a).
 
-## 12. Global chat: a polled log, not a socket
+## 12. The public site, on the same service
+
+The service also serves a static React bundle at the root (`app/web.py`, built from
+`backend/web/`). Routers are mounted first, so `/api` and `/health` are matched before the root
+mount ever sees a path; the mount is added last in `create_app` for exactly that reason, and
+`tests/test_site.py` pins that ordering down because reversing it would hand `/api/version` to
+StaticFiles and break every client at once.
+
+Sharing the service is a choice rather than a shortcut. The page's only dynamic content is the
+presence roster, which it reads from this very backend, so a second origin would buy another
+container, another deploy and a CORS policy in order to fetch from the service it is already
+sitting on. It also means the page cannot claim the backend is up while it is down.
+
+The bundle is built in the image's first stage, so a deploy still pulls exactly one artefact and
+the page can never be a version behind the API it reports on. A missing bundle disables the mount
+rather than failing the boot, since a source checkout has none until someone runs the frontend
+build, and the test suite never does.
+
+## 13. Global chat: a polled log, not a socket
 
 Chat is the only feature in this service where clients need to learn about something they did not
 ask for. Every other endpoint answers a question the caller already had.

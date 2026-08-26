@@ -41,6 +41,7 @@ class PostgresRepo:
             cape=row.cape,
             cosmetics=cosmetics,
             last_seen=row.last_seen,
+            last_active=row.last_active,
         )
 
     async def _slugs_for(self, session: AsyncSession, keys: list[str]) -> dict[str, set[str]]:
@@ -111,7 +112,9 @@ class PostgresRepo:
         async with self._sessionmaker() as session:
             row = await self._row(session, uuid)
             row.server = server
+            # Joining a server is both presence and activity: somebody clicked something.
             row.last_seen = now()
+            row.last_active = now()
             await session.commit()
 
     async def set_cape(self, uuid: str, cape: str) -> None:
@@ -119,9 +122,12 @@ class PostgresRepo:
             (await self._row(session, uuid)).cape = cape
             await session.commit()
 
-    async def touch(self, uuid: str) -> None:
+    async def touch(self, uuid: str, active: bool = False) -> None:
         async with self._sessionmaker() as session:
-            (await self._row(session, uuid)).last_seen = now()
+            row = await self._row(session, uuid)
+            row.last_seen = now()
+            if active:
+                row.last_active = now()
             await session.commit()
 
     async def add_cosmetic(self, uuid: str, slug: str) -> bool:
@@ -159,6 +165,21 @@ class PostgresRepo:
             )
             return list(rows.scalars().all())
 
+    async def presence(self, window_seconds: int) -> list[Player]:
+        cutoff = now() - timedelta(seconds=window_seconds)
+        async with self._sessionmaker() as session:
+            rows = (
+                await session.execute(
+                    select(PlayerRow)
+                    .where(PlayerRow.last_seen > cutoff)
+                    .order_by(PlayerRow.username)
+                )
+            ).scalars().all()
+            # The roster shows who is around, not what they are wearing, so the active sets are
+            # deliberately not joined in: that is the batch cosmetics endpoint's job and it is
+            # already cached client side.
+            return [self._to_domain(row, set()) for row in rows]
+
     async def players_on_server(self, server: str, window_seconds: int) -> list[str]:
         cutoff = now() - timedelta(seconds=window_seconds)
         async with self._sessionmaker() as session:
@@ -184,6 +205,7 @@ class PostgresRepo:
             rank=row.rank,
             color=row.color,
             message=row.message,
+            state=row.state,
             at=row.created_at,
         )
 
@@ -195,6 +217,7 @@ class PostgresRepo:
                 rank=message.rank,
                 color=message.color,
                 message=message.message,
+                state=message.state,
                 created_at=message.at,
             )
             session.add(row)
