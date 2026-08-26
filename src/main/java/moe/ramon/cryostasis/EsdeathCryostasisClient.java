@@ -48,7 +48,6 @@ import moe.ramon.cryostasis.modules.render.ZoomModule;
 import moe.ramon.cryostasis.cosmetics.CosmeticCatalogue;
 import moe.ramon.cryostasis.cosmetics.render.CosmeticLayer;
 import moe.ramon.cryostasis.cosmetics.render.CosmeticModels;
-import moe.ramon.cryostasis.render.StatusTagLayer;
 import moe.ramon.cryostasis.render.WorldRenderHooks;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -114,8 +113,6 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 				RenderLayerParent<PlayerRenderState, PlayerModel> parent =
 						(RenderLayerParent<PlayerRenderState, PlayerModel>) (Object) entityRenderer;
 				helper.register(new CosmeticLayer(parent, context));
-				// After the cosmetics, so the tag is not hidden behind anything worn on the head.
-				helper.register(new StatusTagLayer(parent));
 			}
 		});
 	}

@@ -23,6 +23,7 @@
 		"client.MouseMixin",
 		"client.MultiPlayerGameModeMixin",
 		"client.PlayerMixin",
+		"client.PlayerRendererMixin",
 		"client.ScreenMixin",
 		"client.ServerboundMovePlayerPacketMixin",
 		"client.TakeAllMixin",

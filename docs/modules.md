@@ -91,7 +91,7 @@ server still applies the slowdown, so use them with that in mind.
 | Nightvision | Keeps the world bright like the night vision potion and ignores darkness | none |
 | Freecam | Detaches the camera and flies it through anything, leaving your body behind | Speed, Range |
 | Freelook | Hold a key to look around without turning your body | Key, View |
-| StatusTag | Shows a Cryostasis player's rank and status under their name tag | Rank, Away, Status |
+| StatusTag | Marks Cryostasis players on their name tag with the client emblem, their rank, and their status | Emblem, Rank, Away, Status |
 
 Xray ships with a sensible default selection (the valuable ores plus containers, spawners,
 and vaults; coal and suspicious blocks are off to cut clutter). Toggle materials in the click
@@ -249,7 +249,7 @@ The two are separate on purpose: the state is a fact about your client, the stat
 you want to say. Where both exist, the status is what other people see.
 
 Your presence shows up in four places: the OnlineList HUD module, the roster beside the cosmetics
-menu, under a player's name tag in world (the StatusTag render module), and on global chat lines,
+menu, on a player's name tag in world (the StatusTag render module), and on global chat lines,
 where a sender who was away when they typed is tagged `[AFK]`. That last one is a snapshot taken
 when the line was posted rather than a live lookup, so it says what was true at the time and does
 not rewrite itself later.
