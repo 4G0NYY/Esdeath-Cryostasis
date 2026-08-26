@@ -25,8 +25,8 @@ No Minecraft code lives in this repository. The build ships as a Fabric mod jar 
   elements are anchored and are dragged into place in an editor of their own.
 - Phase 2 (modules): done, and past the original spec. Forty-four modules across six
   categories.
-  - HUD: FPS, CPS, XYZ, ReachDisplay, PingTag, Plains, MLGHelper, ArrayList, Rainbow,
-    OnlineList.
+  - HUD: FPS, CPS, XYZ, ReachDisplay, PingTag, Plains, Durability, MLGHelper, ArrayList,
+    Rainbow, OnlineList.
   - Movement: ToggleSprint, SafeWalk, AutoPath, Zoot, Spider, Jesus, NoCobweb, NoSoulsand,
     Fly.
   - Render: Hitbox, BlockOutline, Zoom, CleanChat, Xray, NoBlind, Nightvision, Freecam,

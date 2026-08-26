@@ -5,6 +5,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
 import java.util.List;
+import java.util.function.IntUnaryOperator;
 
 /**
  * Small helper for the common HUD case of drawing one or more anchored text lines over a
@@ -47,6 +48,20 @@ public final class HudText {
 
 	/** Draw a stack of lines at the module's anchor and record the combined bounds. */
 	public static void drawLines(HudModule module, GuiGraphics context, List<String> lines, int color) {
+		draw(module, context, lines, index -> color);
+	}
+
+	/**
+	 * Draw a stack of lines, each in its own colour, and record the combined bounds. For elements
+	 * where the colour says something about the line it is on rather than styling the block as a
+	 * whole. {@code colors} must hold at least one entry per line.
+	 */
+	public static void drawLines(HudModule module, GuiGraphics context, List<String> lines, int[] colors) {
+		draw(module, context, lines, index -> colors[index]);
+	}
+
+	private static void draw(HudModule module, GuiGraphics context, List<String> lines,
+			IntUnaryOperator colorAt) {
 		Font font = Minecraft.getInstance().font;
 		int lineHeight = font.lineHeight + 1;
 		int widest = 0;
@@ -61,7 +76,7 @@ public final class HudText {
 		context.fill(x, y, x + width, y + height, BACKGROUND);
 		int cursor = y + PAD_Y;
 		for (int i = 0; i < lines.size(); i++) {
-			int lineColor = HudColors.isRainbow() ? HudColors.rainbow(i * 0.08f) : color;
+			int lineColor = HudColors.isRainbow() ? HudColors.rainbow(i * 0.08f) : colorAt.applyAsInt(i);
 			context.drawString(font, lines.get(i), x + PAD_X, cursor, lineColor);
 			cursor += lineHeight;
 		}

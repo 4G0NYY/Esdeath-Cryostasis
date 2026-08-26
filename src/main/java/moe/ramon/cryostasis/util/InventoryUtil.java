@@ -3,6 +3,7 @@ package moe.ramon.cryostasis.util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
@@ -21,6 +22,11 @@ import net.minecraft.world.level.block.state.BlockState;
  * rather than testing instanceof on classes that no longer exist.
  */
 public final class InventoryUtil {
+	private static final double BARE_HAND_DAMAGE = 1.0;
+
+	/** Larger than any weapon's damage, so it sorts swords into a tier of their own. */
+	private static final double SWORD_PREFERENCE = 1000.0;
+
 	private InventoryUtil() {
 	}
 
@@ -70,19 +76,32 @@ public final class InventoryUtil {
 		return best;
 	}
 
-	/** Hotbar slot of the highest-damage weapon, or -1 when nothing beats a bare fist. */
+	/**
+	 * Hotbar slot of the best melee weapon, or -1 when nothing beats a bare fist.
+	 *
+	 * A sword outranks anything else in the hotbar even where an axe hits harder on paper.
+	 * Attack damage is only half of an exchange: a sword recovers to full strength in roughly
+	 * half the time an axe takes and sweeps everything standing beside the target, so across any
+	 * fight longer than a single hit the sword does more. Damage still decides between two swords,
+	 * and between whatever is left when the hotbar holds no sword at all.
+	 */
 	public static int bestWeaponSlot(Minecraft mc) {
 		Inventory inv = mc.player.getInventory();
 		int best = -1;
-		double bestDamage = 1.0; // bare-hand attack damage baseline
+		double bestScore = 0.0;
 		for (int i = 0; i < 9; i++) {
 			ItemStack s = inv.getItem(i);
 			if (s.isEmpty()) {
 				continue;
 			}
 			double dmg = attackDamage(s);
-			if (dmg > bestDamage) {
-				bestDamage = dmg;
+			if (dmg <= BARE_HAND_DAMAGE) {
+				// No harder than punching, so not worth a swap.
+				continue;
+			}
+			double score = dmg + (s.is(ItemTags.SWORDS) ? SWORD_PREFERENCE : 0.0);
+			if (score > bestScore) {
+				bestScore = score;
 				best = i;
 			}
 		}

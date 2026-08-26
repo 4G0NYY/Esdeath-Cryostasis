@@ -3,6 +3,7 @@ package moe.ramon.cryostasis;
 import moe.ramon.cryostasis.module.ModuleManager;
 import moe.ramon.cryostasis.modules.hud.ArrayListModule;
 import moe.ramon.cryostasis.modules.hud.CpsModule;
+import moe.ramon.cryostasis.modules.hud.DurabilityModule;
 import moe.ramon.cryostasis.modules.hud.FpsModule;
 import moe.ramon.cryostasis.modules.hud.MlgHelperModule;
 import moe.ramon.cryostasis.modules.hud.OnlineListModule;
@@ -125,6 +126,7 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 		modules.register(new ReachDisplayModule());
 		modules.register(new PingTagModule());
 		modules.register(new PlainsModule());
+		modules.register(new DurabilityModule());
 		modules.register(new MlgHelperModule());
 		modules.register(new ArrayListModule());
 		modules.register(new RainbowModule());

@@ -37,6 +37,7 @@ the editor as a small grey chip so it can be placed.
 | ReachDisplay | Distance to the entity you last attacked, held briefly after the swing | none |
 | PingTag | Your latency to the current server | none |
 | Plains | The biome you are standing in | none |
+| Durability | Uses left in each hand and each worn armor piece | Hand, Offhand, Armor, Percent |
 | MLGHelper | While sneaking, your fall height and a water-bucket cue | none |
 | ArrayList | The list of active modules, top right, sorted by width | Background on/off |
 | OnlineList | Everyone currently running Cryostasis, with their rank colour and status | Max Rows, Show Away, Show Status, Header |
@@ -175,6 +176,12 @@ crit.
 | AutoTotem | Keeps a Totem of Undying in your offhand whenever you are carrying one | none |
 | FastBreak | Mines and breaks blocks faster | Multiplier |
 | NoHunger | Keeps the hunger bar from draining | none |
+
+AutoTool picks a weapon by more than the damage number on the tooltip. A sword is taken over
+anything else in the hotbar even where an axe hits harder on paper, because an axe recovers to
+full strength at roughly half a sword's rate and sweeps nothing beside the target, so over a
+fight the sword lands more. Damage decides between two swords, and between whatever else is
+there when the hotbar holds no sword.
 
 NoHunger drops the exhaustion that food and saturation are spent on, so the bar holds where
 it is. It never adds anything back: a bar already empty stays empty until you eat. Hunger is
