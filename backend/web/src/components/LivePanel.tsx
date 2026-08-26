@@ -17,6 +17,11 @@ const STATE_LABEL: Record<PresenceState, string> = {
  * from the same endpoint, so the page proves the service behind it is up instead of asserting it.
  * An unreachable backend says so plainly; it never shows a zero that could be mistaken for a
  * quiet evening.
+ *
+ * It shows less than the endpoint returns, and deliberately. Which game server a named person is
+ * playing on right now is useful in game, among people who already share a channel with them, and
+ * is something else again on a page anyone can load. Names, ranks and states are the showcase;
+ * the server is not, so it is left off here.
  */
 export function LivePanel() {
   const [version, setVersion] = useState<string | null>(null)
@@ -103,10 +108,7 @@ export function LivePanel() {
                         {player.rank}
                       </span>
                     )}
-                    <span className="status">
-                      {player.status || STATE_LABEL[player.state]}
-                      {player.server ? ` · ${player.server}` : ''}
-                    </span>
+                    <span className="status">{player.status || STATE_LABEL[player.state]}</span>
                   </div>
                 ))}
               </div>
