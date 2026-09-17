@@ -6,8 +6,8 @@ module gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis/launcher
 go 1.25.0
 
 require (
-	gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis v0.0.0
 	github.com/wailsapp/wails/v2 v2.13.0
+	gitlab.ramon.moe/4G0NYY/Esdeath-Cryostasis v0.0.0
 )
 
 require (
