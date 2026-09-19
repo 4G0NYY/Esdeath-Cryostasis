@@ -1,5 +1,6 @@
 package moe.ramon.cryostasis.modules.hud;
 
+import moe.ramon.cryostasis.hud.HudLine;
 import moe.ramon.cryostasis.hud.HudModule;
 import moe.ramon.cryostasis.hud.HudText;
 import moe.ramon.cryostasis.setting.BooleanSetting;
@@ -18,10 +19,6 @@ public final class FpsModule extends HudModule {
 
 	@Override
 	public void render(GuiGraphics context, float tickDelta) {
-		String text = Integer.toString(mc.getFps());
-		if (showLabel.get()) {
-			text = text + " FPS";
-		}
-		HudText.drawLine(this, context, text);
+		HudText.draw(this, context, HudLine.of(showLabel.get() ? "FPS" : "", Integer.toString(mc.getFps())));
 	}
 }

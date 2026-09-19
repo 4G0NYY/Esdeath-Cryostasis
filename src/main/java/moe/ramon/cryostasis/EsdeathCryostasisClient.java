@@ -74,6 +74,7 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 
 		// Restore saved state after modules exist so their settings and toggles apply.
 		cryostasis.getConfigManager().load();
+		cryostasis.getPresetManager().load();
 
 		// World-render modules draw through Fabric's render events, not their own Mixins.
 		WorldRenderHooks.register(cryostasis.getModuleManager());
@@ -93,6 +94,7 @@ public final class EsdeathCryostasisClient implements ClientModInitializer {
 			// Presence is not gated on a module: whether this player shows as online is a
 			// property of the client running, not of any one feature being switched on.
 			cryostasis.getPresenceService().tick();
+			cryostasis.getPresetService().tick();
 			cryostasis.getModuleManager().onTick();
 		});
 

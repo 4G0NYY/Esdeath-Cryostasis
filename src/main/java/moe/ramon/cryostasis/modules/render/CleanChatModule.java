@@ -13,5 +13,6 @@ import moe.ramon.cryostasis.module.Module;
 public final class CleanChatModule extends Module {
 	public CleanChatModule() {
 		super("CleanChat", "Hides consecutive duplicate chat messages.", Category.RENDER);
+		markQol();
 	}
 }

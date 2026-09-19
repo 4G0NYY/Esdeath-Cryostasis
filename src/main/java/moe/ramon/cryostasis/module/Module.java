@@ -26,6 +26,7 @@ public abstract class Module {
 
 	private int keyCode = GLFW.GLFW_KEY_UNKNOWN;
 	private boolean enabled;
+	private boolean qol;
 
 	protected Module(String name, String description, Category category) {
 		this.name = name;
@@ -98,6 +99,22 @@ public abstract class Module {
 		return keyCode != GLFW.GLFW_KEY_UNKNOWN;
 	}
 
+	// Server safety.
+
+	/**
+	 * Mark this module as quality of life: nothing a server that forbids cheats would object to.
+	 * The built-in QoL preset switches off every module that is not marked, so a module is unsafe
+	 * until it says otherwise, and forgetting the mark on a new module costs a convenience rather
+	 * than a ban. Called from the constructor.
+	 */
+	protected final void markQol() {
+		this.qol = true;
+	}
+
+	public final boolean isQol() {
+		return qol;
+	}
+
 	// Identity.
 
 	public final String getName() {
@@ -113,11 +130,11 @@ public abstract class Module {
 	}
 
 	/**
-	 * The text shown in the ArrayList HUD. Defaults to the name, but a module can
-	 * append live state (a mode, a value) by overriding this.
+	 * Live state the ArrayList shows after the module's name, dimmer than the name itself: a mode,
+	 * a count, a value. Empty by default.
 	 */
-	public String getHudLabel() {
-		return name;
+	public String getHudSuffix() {
+		return "";
 	}
 
 	/** Convenience for subclasses that expose an extra hotkey as a setting. */

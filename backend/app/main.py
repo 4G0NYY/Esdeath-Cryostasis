@@ -18,7 +18,7 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 
 from app.api.deps import RateLimiter
-from app.api.v1 import auth, chat, cosmetics, meta, players
+from app.api.v1 import auth, chat, cosmetics, meta, players, presets
 from app.config import Settings, get_settings
 from app.web import mount_site
 
@@ -73,7 +73,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Cryostasis backend", version=settings.version, lifespan=_lifespan)
     app.state.settings = settings
 
-    for router in (meta.router, players.router, cosmetics.router, auth.router, chat.router):
+    for router in (
+        meta.router,
+        players.router,
+        cosmetics.router,
+        auth.router,
+        chat.router,
+        presets.router,
+    ):
         app.include_router(router, prefix="/api")
 
     @app.get("/health")

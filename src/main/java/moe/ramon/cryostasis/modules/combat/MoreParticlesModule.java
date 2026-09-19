@@ -11,5 +11,6 @@ import moe.ramon.cryostasis.module.Module;
 public final class MoreParticlesModule extends Module {
 	public MoreParticlesModule() {
 		super("MoreParticles", "Triples crit particles, on legit crits unless Sharpness is on.", Category.COMBAT);
+		markQol();
 	}
 }

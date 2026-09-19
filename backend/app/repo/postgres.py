@@ -13,8 +13,16 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db.models import CapeRow, ChatMessageRow, ChatMuteRow, PlayerCosmeticRow, PlayerRow
+from app.db.models import (
+    CapeRow,
+    ChatMessageRow,
+    ChatMuteRow,
+    PlayerCosmeticRow,
+    PlayerRow,
+    PresetRow,
+)
 from app.domain.models import ChatMessage, Mute, Player, normalize_uuid, now
+from app.domain.presets import Preset
 
 
 class PostgresRepo:
@@ -304,6 +312,41 @@ class PostgresRepo:
         async with self._sessionmaker() as session:
             rows = await session.execute(select(ChatMuteRow).where(ChatMuteRow.until > now()))
             return [self._mute_to_domain(r) for r in rows.scalars().all()]
+
+    async def list_presets(self, uuid: str) -> list[Preset]:
+        async with self._sessionmaker() as session:
+            rows = await session.execute(
+                select(PresetRow)
+                .where(PresetRow.player_uuid == normalize_uuid(uuid))
+                .order_by(func.lower(PresetRow.name))
+            )
+            return [
+                Preset(name=r.name, modules=r.modules, updated_at=r.updated_at)
+                for r in rows.scalars().all()
+            ]
+
+    async def put_preset(self, uuid: str, preset: Preset) -> None:
+        key = normalize_uuid(uuid)
+        modules = {name: state.model_dump(mode="json") for name, state in preset.modules.items()}
+        async with self._sessionmaker() as session:
+            await self._row(session, uuid)  # ensure the FK target exists
+            row = await session.get(PresetRow, (key, preset.name))
+            if row is None:
+                row = PresetRow(player_uuid=key, name=preset.name)
+                session.add(row)
+            row.modules = modules
+            row.updated_at = preset.updated_at
+            await session.commit()
+
+    async def delete_preset(self, uuid: str, name: str) -> bool:
+        async with self._sessionmaker() as session:
+            result = await session.execute(
+                delete(PresetRow).where(
+                    PresetRow.player_uuid == normalize_uuid(uuid), PresetRow.name == name
+                )
+            )
+            await session.commit()
+            return (result.rowcount or 0) > 0
 
     async def close(self) -> None:
         return None

@@ -16,6 +16,7 @@ public final class HitboxModule extends Module {
 
 	public HitboxModule() {
 		super("Hitbox", "Outlines entity hitboxes.", Category.RENDER);
+		markQol();
 	}
 
 	public int getColor() {

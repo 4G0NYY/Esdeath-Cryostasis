@@ -10,6 +10,9 @@ import moe.ramon.cryostasis.event.EventBus;
 import moe.ramon.cryostasis.hud.HudManager;
 import moe.ramon.cryostasis.input.InputHandler;
 import moe.ramon.cryostasis.module.ModuleManager;
+import moe.ramon.cryostasis.preset.PresetManager;
+import moe.ramon.cryostasis.preset.PresetService;
+import moe.ramon.cryostasis.preset.PresetStore;
 import moe.ramon.cryostasis.service.ClickTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +36,7 @@ public final class Cryostasis {
 	private final HudManager hudManager = new HudManager(moduleManager);
 	private final ConfigManager configManager = new ConfigManager(moduleManager, LOGGER);
 	private final InputHandler inputHandler = new InputHandler(moduleManager);
+	private final PresetManager presetManager = new PresetManager(moduleManager, new PresetStore(LOGGER));
 
 	// One connection to the backend, shared by everything that talks to it, so the bearer token
 	// the session handshake buys is attached in exactly one place.
@@ -41,6 +45,7 @@ public final class Cryostasis {
 	private final CosmeticService cosmeticService = new CosmeticService(apiClient, sessionService);
 	private final ChatService chatService = new ChatService(apiClient, sessionService);
 	private final PresenceService presenceService = new PresenceService(apiClient, sessionService);
+	private final PresetService presetService = new PresetService(apiClient, sessionService, presetManager);
 
 	Cryostasis() {
 		instance = this;
@@ -72,6 +77,14 @@ public final class Cryostasis {
 
 	public InputHandler getInputHandler() {
 		return inputHandler;
+	}
+
+	public PresetManager getPresetManager() {
+		return presetManager;
+	}
+
+	public PresetService getPresetService() {
+		return presetService;
 	}
 
 	public ApiClient getApiClient() {

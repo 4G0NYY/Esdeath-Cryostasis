@@ -1,5 +1,6 @@
 package moe.ramon.cryostasis.modules.hud;
 
+import moe.ramon.cryostasis.hud.HudLine;
 import moe.ramon.cryostasis.hud.HudModule;
 import moe.ramon.cryostasis.hud.HudText;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,6 +15,7 @@ public final class PlainsModule extends HudModule {
 	@Override
 	public void render(GuiGraphics context, float tickDelta) {
 		if (mc.player == null || mc.level == null) {
+			setBounds(0, 0, 0, 0);
 			return;
 		}
 		BlockPos pos = mc.player.blockPosition();
@@ -21,7 +23,7 @@ public final class PlainsModule extends HudModule {
 				.unwrapKey()
 				.map(key -> prettify(key.location().getPath()))
 				.orElse("Unknown");
-		HudText.drawLine(this, context, "Biome: " + biome, HudText.WHITE);
+		HudText.draw(this, context, HudLine.of("Biome", biome));
 	}
 
 	/** Turn a registry path such as "snowy_taiga" into "Snowy Taiga". */

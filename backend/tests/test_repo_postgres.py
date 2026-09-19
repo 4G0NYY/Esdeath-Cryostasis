@@ -149,3 +149,24 @@ async def test_mute_lapses_without_a_sweeper(repo):
 
     assert await repo.clear_mute(UUID) is True
     assert await repo.get_mute(UUID) is None
+
+
+async def test_presets_roundtrip(repo):
+    from app.domain.models import now
+    from app.domain.presets import ModuleState, Preset
+
+    pvp = {"killaura": ModuleState(enabled=True, settings={"Reach": 3.5})}
+    await repo.put_preset(UUID, Preset(name="PvP", modules=pvp, updated_at=now()))
+    await repo.put_preset(UUID, Preset(name="anarchy", modules={}, updated_at=now()))
+
+    presets = await repo.list_presets(UUID)
+    assert [p.name for p in presets] == ["anarchy", "PvP"]
+    assert presets[1].modules == pvp
+
+    # Putting an existing name replaces it rather than adding a second row.
+    await repo.put_preset(UUID, Preset(name="PvP", modules={}, updated_at=now()))
+    assert [p.modules for p in await repo.list_presets(UUID) if p.name == "PvP"] == [{}]
+
+    assert await repo.delete_preset(UUID, "PvP") is True
+    assert await repo.delete_preset(UUID, "PvP") is False
+    assert [p.name for p in await repo.list_presets(UUID)] == ["anarchy"]

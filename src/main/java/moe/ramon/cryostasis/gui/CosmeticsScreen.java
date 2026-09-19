@@ -54,9 +54,6 @@ public final class CosmeticsScreen extends Screen {
 	/** The backend caps a status at this, so the field refuses the rest rather than losing it. */
 	private static final int STATUS_MAX = 64;
 
-	private static final int COLOR_ONLINE = 0xFF4CC77A;
-	private static final int COLOR_AWAY = 0xFFE8B14C;
-
 	private EditBox status;
 	// What the field held when it was last sent, so closing the screen does not repost an
 	// unchanged line on every visit.
@@ -207,7 +204,7 @@ public final class CosmeticsScreen extends Screen {
 			}
 			any = true;
 			context.fill(x, y + 2, x + 4, y + font.lineHeight - 1,
-					entry.isOnline() ? COLOR_ONLINE : COLOR_AWAY);
+					entry.isOnline() ? Theme.GOOD : Theme.WARN);
 			String name = entry.username();
 			context.drawString(font, name, x + 8, y, entry.color());
 			// The status is trimmed to whatever room is left, since a player can write more than

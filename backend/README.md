@@ -17,7 +17,7 @@ app/
   config.py        pydantic-settings, env driven (CRYOSTASIS_ prefix)
   api/
     deps.py        DI: repo, settings, current caller, rate limiter
-    v1/            meta (version, capes, ranks), players, cosmetics, auth, chat
+    v1/            meta (version, capes, ranks), players, cosmetics, auth, chat, presets
   domain/          pure schemas and rules (no FastAPI, no SQLAlchemy)
   repo/            base Protocol, memory.py (dev/tests), postgres.py
   storage/         CDN URL building from object keys
@@ -112,6 +112,17 @@ curl -X PUT https://cryostasis.ramon.moe/api/players/<uuid>/rank \
 
 With `CRYOSTASIS_ADMIN_TOKEN` unset the route answers 403 for everyone, so a deployment that
 forgot to configure one cannot have its ranks rewritten.
+
+## Presets
+
+Module presets live under `/players/{uuid}/presets` and are private to their owner, reads
+included. The contract, limits and refusals are in section 8 of `../docs/backend-api.md`.
+
+```
+curl localhost:8000/api/players/<uuid>/presets
+curl -H 'Content-Type: application/json' -X PUT localhost:8000/api/players/<uuid>/presets/PvP \
+     -d '{"modules":{"fps":{"enabled":true,"settings":{"Label":true}}}}'
+```
 
 ## Global chat
 

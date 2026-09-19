@@ -6,10 +6,12 @@ import moe.ramon.cryostasis.module.Module;
 import moe.ramon.cryostasis.setting.KeybindSetting;
 import moe.ramon.cryostasis.setting.ModeSetting;
 import net.minecraft.client.CameraType;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.util.Mth;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Look around without turning. Hold the key (Left Alt by default) and the mouse aims the camera
@@ -30,6 +32,10 @@ import java.util.List;
  *
  * {@link FreecamModule} is the heavier sibling: it takes the camera off the body entirely and
  * flies it. That one wins if both are active, so this stays out of its way.
+ *
+ * Hypixel forbids freelook, so on hypixel.net and its subdomains the key does nothing. The module
+ * is not switched off for it: that would be saved, and the player would have to remember to turn
+ * it back on for every other server.
  */
 public final class FreelookModule extends Module {
 	private final KeybindSetting key = keybindSetting("Key", GLFW.GLFW_KEY_LEFT_ALT);
@@ -42,6 +48,7 @@ public final class FreelookModule extends Module {
 
 	public FreelookModule() {
 		super("Freelook", "Hold a key to look around without turning your body.", Category.RENDER);
+		markQol();
 	}
 
 	@Override
@@ -53,14 +60,14 @@ public final class FreelookModule extends Module {
 	public void onTick() {
 		// Only a safety net: the key edges do the real work. A screen that opened without a key
 		// release behind it, or a world that went away, both end the glance here.
-		if (looking && (mc.player == null || mc.screen != null)) {
+		if (looking && (mc.player == null || mc.screen != null || onHypixel())) {
 			release();
 		}
 	}
 
 	/** Called for every key press that reaches the client, whether or not it is this one. */
 	public void onKeyDown(int pressed) {
-		if (looking || !key.matches(pressed) || mc.player == null) {
+		if (looking || !key.matches(pressed) || mc.player == null || onHypixel()) {
 			return;
 		}
 		// Freecam owns the camera outright while it is out, and it saves and restores the view
@@ -116,6 +123,28 @@ public final class FreelookModule extends Module {
 	public void turn(double yRot, double xRot) {
 		yaw += (float) yRot * 0.15f;
 		pitch = Mth.clamp(pitch + (float) xRot * 0.15f, -90.0f, 90.0f);
+	}
+
+	@Override
+	public String getHudSuffix() {
+		return onHypixel() ? "off here" : "";
+	}
+
+	private boolean onHypixel() {
+		ServerData server = mc.getCurrentServer();
+		if (server == null) {
+			return false;
+		}
+		String host = server.ip.toLowerCase(Locale.ROOT).strip();
+		int port = host.lastIndexOf(':');
+		if (port >= 0) {
+			host = host.substring(0, port);
+		}
+		// A fully qualified name may end in a dot, and it still reaches the same server.
+		if (host.endsWith(".")) {
+			host = host.substring(0, host.length() - 1);
+		}
+		return host.equals("hypixel.net") || host.endsWith(".hypixel.net");
 	}
 
 	private CameraType cameraType() {

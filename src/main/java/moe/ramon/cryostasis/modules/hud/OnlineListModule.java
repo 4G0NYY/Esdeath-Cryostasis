@@ -2,7 +2,9 @@ package moe.ramon.cryostasis.modules.hud;
 
 import moe.ramon.cryostasis.Cryostasis;
 import moe.ramon.cryostasis.backend.PresenceService;
+import moe.ramon.cryostasis.gui.Skin;
 import moe.ramon.cryostasis.gui.Theme;
+import moe.ramon.cryostasis.hud.HudColors;
 import moe.ramon.cryostasis.hud.HudModule;
 import moe.ramon.cryostasis.setting.BooleanSetting;
 import moe.ramon.cryostasis.setting.NumberSetting;
@@ -24,13 +26,11 @@ import java.util.List;
  * so a slow backend costs a stale list rather than a stutter.
  */
 public final class OnlineListModule extends HudModule {
-	private static final int DOT_WIDTH = 6;
+	private static final int DOT = 4;
 	private static final int GAP = 4;
-	private static final int PAD = 3;
-	private static final int BACKGROUND = 0x900A111B;
-
-	private static final int COLOR_ONLINE = 0xFF4CC77A;
-	private static final int COLOR_AWAY = 0xFFE8B14C;
+	private static final int PAD = 5;
+	private static final int ROW_HEIGHT = 11;
+	private static final int HEADER_HEIGHT = 13;
 
 	private final NumberSetting maxRows = register(new NumberSetting("Max Rows", 8, 1, 20, 1));
 	private final BooleanSetting showAway = register(new BooleanSetting("Show Away", true));
@@ -70,55 +70,59 @@ public final class OnlineListModule extends HudModule {
 			}
 			shown.add(entry);
 		}
-
-		String header = presence.onlineCount() + " online, " + presence.awayCount() + " away";
-		int lineHeight = font.lineHeight + 1;
-		int rows = shown.size() + (showHeader.get() ? 1 : 0);
-		if (rows == 0) {
+		boolean header = showHeader.get();
+		if (shown.isEmpty() && !header) {
 			setBounds(context.guiWidth(), 0, 0, 0);
 			return;
 		}
 
-		int widest = showHeader.get() ? font.width(header) : 0;
+		String title = "Online";
+		String tally = presence.onlineCount() + " · " + presence.awayCount() + " away";
+		int widest = header ? font.width(title) + GAP * 2 + font.width(tally) : 0;
 		for (PresenceService.Entry entry : shown) {
-			widest = Math.max(widest, DOT_WIDTH + GAP + font.width(line(entry)));
+			widest = Math.max(widest, DOT + GAP + rowWidth(font, entry));
 		}
 
 		int width = widest + PAD * 2;
-		int height = lineHeight * rows + 2;
+		int headerHeight = header ? HEADER_HEIGHT : 0;
+		int height = headerHeight + shown.size() * ROW_HEIGHT + 2;
 		int x = resolveX(context.guiWidth(), width);
 		int y = resolveY(context.guiHeight(), height);
 
-		context.fill(x, y, x + width, y + height, BACKGROUND);
-
-		int cursor = y + 1;
-		int textX = x + PAD;
-		if (showHeader.get()) {
-			context.drawString(font, header, textX, cursor, Theme.SUBTEXT);
-			cursor += lineHeight;
+		Skin.shadow(context, x, y, width, height);
+		Skin.panel(context, x, y, width, height, Theme.PANEL);
+		if (header) {
+			context.fill(x + 1, y, x + width - 1, y + HEADER_HEIGHT, Theme.HEADER);
+			context.fill(x, y + HEADER_HEIGHT - 1, x + width, y + HEADER_HEIGHT, HudColors.accent(0.0f));
+			context.drawString(font, title, x + PAD, y + 3, Theme.TEXT, false);
+			context.drawString(font, tally, x + width - PAD - font.width(tally), y + 3, Theme.SUBTEXT, false);
 		}
+
+		int rowY = y + headerHeight + 1;
 		for (PresenceService.Entry entry : shown) {
-			// A filled square rather than a glyph: it reads as a state light at every GUI scale
-			// and needs no font that has a dot in it.
-			int dot = entry.isOnline() ? COLOR_ONLINE : COLOR_AWAY;
-			context.fill(textX, cursor + 2, textX + DOT_WIDTH - 2, cursor + font.lineHeight - 1, dot);
-			context.drawString(font, line(entry), textX + DOT_WIDTH + GAP, cursor, entry.color());
-			cursor += lineHeight;
+			int textY = rowY + (ROW_HEIGHT - font.lineHeight) / 2 + 1;
+			int dotY = rowY + (ROW_HEIGHT - DOT) / 2;
+			context.fill(x + PAD, dotY, x + PAD + DOT, dotY + DOT, entry.isOnline() ? Theme.GOOD : Theme.WARN);
+			int nameX = x + PAD + DOT + GAP;
+			context.drawString(font, entry.username(), nameX, textY, entry.color(), false);
+			if (showStatus.get()) {
+				int statusX = nameX + font.width(entry.username()) + GAP;
+				context.drawString(font, entry.label(), statusX, textY, Theme.SUBTEXT, false);
+			}
+			rowY += ROW_HEIGHT;
 		}
 
 		setBounds(x, y, width, height);
 	}
 
-	private String line(PresenceService.Entry entry) {
-		if (!showStatus.get()) {
-			return entry.username();
-		}
-		return entry.username() + " " + entry.label();
+	private int rowWidth(Font font, PresenceService.Entry entry) {
+		int name = font.width(entry.username());
+		return showStatus.get() ? name + GAP + font.width(entry.label()) : name;
 	}
 
 	@Override
-	public String getHudLabel() {
+	public String getHudSuffix() {
 		PresenceService presence = Cryostasis.get().getPresenceService();
-		return getName() + " " + (presence.onlineCount() + presence.awayCount());
+		return Integer.toString(presence.onlineCount() + presence.awayCount());
 	}
 }

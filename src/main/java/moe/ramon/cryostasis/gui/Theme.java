@@ -38,4 +38,9 @@ public final class Theme {
 	public static final int ACCENT_DIM = 0xFF2C4A63;
 	public static final int TEXT = 0xFFFFFFFF;
 	public static final int SUBTEXT = 0xFF9AA7B8;
+
+	// Status: a value that is fine, one worth watching, and one that needs acting on now.
+	public static final int GOOD = 0xFF4CC77A;
+	public static final int WARN = 0xFFE8B14C;
+	public static final int BAD = 0xFFE05A5A;
 }

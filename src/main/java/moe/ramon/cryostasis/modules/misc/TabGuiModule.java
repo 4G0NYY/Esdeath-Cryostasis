@@ -4,6 +4,7 @@ import moe.ramon.cryostasis.Cryostasis;
 import moe.ramon.cryostasis.gui.HudEditorScreen;
 import moe.ramon.cryostasis.gui.Skin;
 import moe.ramon.cryostasis.gui.Theme;
+import moe.ramon.cryostasis.hud.Easing;
 import moe.ramon.cryostasis.hud.HudColors;
 import moe.ramon.cryostasis.hud.HudModule;
 import moe.ramon.cryostasis.module.Category;
@@ -55,7 +56,7 @@ public final class TabGuiModule extends HudModule {
 	private float categorySlide;
 	private float moduleSlide;
 	private float openAmount;
-	private long lastFrame;
+	private final Easing easing = new Easing();
 
 	public TabGuiModule() {
 		super("TabGui", "Arrow-key on-screen menu with the same toggles as the click GUI.",
@@ -220,16 +221,9 @@ public final class TabGuiModule extends HudModule {
 		}
 	}
 
-	/**
-	 * Advance the eased values towards where the keys have put the selection. Driven by the wall
-	 * clock rather than by a tick, so the slide runs at the same speed at any frame rate and needs
-	 * no hook of its own.
-	 */
+	/** Advance the eased values towards where the keys have put the selection. */
 	private void ease() {
-		long now = System.currentTimeMillis();
-		float delta = lastFrame == 0 ? 0.0f : Math.min(0.1f, (now - lastFrame) / 1000.0f);
-		lastFrame = now;
-		float step = 1.0f - (float) Math.exp(-EASE_RATE * delta);
+		float step = easing.step(EASE_RATE);
 
 		categorySlide += (categoryIndex - categorySlide) * step;
 		moduleSlide += (moduleIndex - moduleSlide) * step;
@@ -247,6 +241,6 @@ public final class TabGuiModule extends HudModule {
 	 * HUD; the per-row offset spreads the sweep into a gradient down the column.
 	 */
 	private int accent(int index) {
-		return HudColors.isRainbow() ? HudColors.rainbow(index * 0.06f) : Theme.ACCENT;
+		return HudColors.accent(index * 0.06f);
 	}
 }

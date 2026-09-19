@@ -15,6 +15,7 @@ from typing import Protocol, runtime_checkable
 from datetime import datetime
 
 from app.domain.models import ChatMessage, Mute, Player
+from app.domain.presets import Preset
 
 
 @runtime_checkable
@@ -122,6 +123,18 @@ class Repo(Protocol):
         ...
 
     async def active_mutes(self) -> list[Mute]:
+        ...
+
+    async def list_presets(self, uuid: str) -> list[Preset]:
+        """The player's presets, ordered by name ignoring case, which is how the menu lists them."""
+        ...
+
+    async def put_preset(self, uuid: str, preset: Preset) -> None:
+        """Create or replace the preset of that name."""
+        ...
+
+    async def delete_preset(self, uuid: str, name: str) -> bool:
+        """Returns whether there was one to delete."""
         ...
 
     async def close(self) -> None:

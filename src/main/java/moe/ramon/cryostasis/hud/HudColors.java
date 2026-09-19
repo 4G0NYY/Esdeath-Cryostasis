@@ -1,10 +1,12 @@
 package moe.ramon.cryostasis.hud;
 
+import moe.ramon.cryostasis.gui.Theme;
+
 /**
- * Central color source for HUD text. Returns solid white normally, or a wall-clock driven
- * rainbow sweep when rainbow mode is on. Reading through here keeps every HUD element in
- * step and lets the Rainbow module flip a single flag instead of each module tracking its
- * own state.
+ * Central color source for the HUD's accents and neutral text, which hold still normally and
+ * sweep through a wall-clock driven rainbow when rainbow mode is on. Reading through here keeps
+ * every HUD element in step and lets the Rainbow module flip a single flag instead of each module
+ * tracking its own state.
  *
  * The sweep is derived from the system clock rather than a frame counter, so it advances at
  * a steady rate independent of frame rate and needs no tick hook to animate.
@@ -28,9 +30,9 @@ public final class HudColors {
 		speed = Math.max(0.1f, value);
 	}
 
-	/** The default HUD text color for this frame. */
-	public static int primary() {
-		return rainbow ? rainbow(0.0f) : 0xFFFFFFFF;
+	/** The accent for a stripe or highlight: the steel accent, or the sweep in rainbow mode. */
+	public static int accent(float offset) {
+		return rainbow ? rainbow(offset) : Theme.ACCENT;
 	}
 
 	/**

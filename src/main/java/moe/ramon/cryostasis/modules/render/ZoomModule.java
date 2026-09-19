@@ -14,6 +14,7 @@ public final class ZoomModule extends Module {
 
 	public ZoomModule() {
 		super("Zoom", "Zooms in by narrowing your field of view.", Category.RENDER);
+		markQol();
 	}
 
 	public float getFactor() {

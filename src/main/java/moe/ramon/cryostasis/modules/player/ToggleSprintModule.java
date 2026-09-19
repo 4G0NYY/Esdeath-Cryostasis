@@ -11,6 +11,7 @@ import moe.ramon.cryostasis.module.Module;
 public final class ToggleSprintModule extends Module {
 	public ToggleSprintModule() {
 		super("ToggleSprint", "Automatically sprints while moving forward.", Category.MOVEMENT);
+		markQol();
 	}
 
 	@Override

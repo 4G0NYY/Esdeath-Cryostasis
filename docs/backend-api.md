@@ -220,3 +220,31 @@ are honoured only with auth off, where a dev instance has no identity to take. R
 Moderation is what the original relay lacked, and why the first design dropped chat rather than
 port it: messages are length-capped and stripped of control characters, every sender has their
 own rate bucket, staff ranks can mute and delete, and the log is swept daily rather than kept.
+
+## 8. Presets
+
+A preset is a named snapshot of which modules a player has on and how each is set. The backend
+stores it without reading it: `modules` is the client's own shape, keyed by lower-cased module
+name, so a module added to the client needs no backend change.
+
+| Method and path | Auth | Request body | Response |
+|---|---|---|---|
+| `GET /players/{uuid}/presets` | owner | - | `{ "presets": [{ "name": "...", "modules": {...}, "updated_at": "..." }] }` |
+| `PUT /players/{uuid}/presets/{name}` | owner | `{ "modules": { "<module>": { "enabled": bool, "settings": {...} } } }` | `204` |
+| `DELETE /players/{uuid}/presets/{name}` | owner | - | `{ "ok": bool }` |
+
+"Owner" is the `require_caller` check every other player write uses. Unlike cosmetics, reads take
+it too: a cosmetic is on show to everyone the player meets, but a preset is how they have set up
+their client, and nobody else needs it.
+
+`PUT` creates or replaces. The list comes back ordered by name, ignoring case.
+
+| Rule | Limit | Refusal |
+|---|---|---|
+| Name | 1 to 24 letters, digits, spaces, `-` or `_`, after trimming | `400` |
+| Reserved name | `QoL` in any case, the client's built-in preset | `400` |
+| Presets per player | 32. Overwriting one is always allowed | `409` |
+| `modules` size | 32 KiB serialized | `422` |
+
+Names are limited to that set because the name is a path segment, and an encoded slash is decoded
+before routing, so a name holding one could be saved but never deleted.

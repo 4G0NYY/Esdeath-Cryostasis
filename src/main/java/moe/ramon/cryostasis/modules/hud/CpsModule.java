@@ -1,6 +1,7 @@
 package moe.ramon.cryostasis.modules.hud;
 
 import moe.ramon.cryostasis.Cryostasis;
+import moe.ramon.cryostasis.hud.HudLine;
 import moe.ramon.cryostasis.hud.HudModule;
 import moe.ramon.cryostasis.hud.HudText;
 import moe.ramon.cryostasis.service.ClickTracker;
@@ -28,16 +29,13 @@ public final class CpsModule extends HudModule {
 		ClickTracker tracker = Cryostasis.get().getClickTracker();
 		long now = System.currentTimeMillis();
 
-		String text;
+		String value;
 		if (button.is("Both")) {
-			text = tracker.cps(ClickTracker.LEFT, now) + " | " + tracker.cps(ClickTracker.RIGHT, now);
+			value = tracker.cps(ClickTracker.LEFT, now) + " \u00b7 " + tracker.cps(ClickTracker.RIGHT, now);
 		} else {
 			int which = button.is("Right") ? ClickTracker.RIGHT : ClickTracker.LEFT;
-			text = Integer.toString(tracker.cps(which, now));
+			value = Integer.toString(tracker.cps(which, now));
 		}
-		if (showLabel.get()) {
-			text = text + " CPS";
-		}
-		HudText.drawLine(this, context, text);
+		HudText.draw(this, context, HudLine.of(showLabel.get() ? "CPS" : "", value));
 	}
 }

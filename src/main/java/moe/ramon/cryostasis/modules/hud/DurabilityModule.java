@@ -1,5 +1,7 @@
 package moe.ramon.cryostasis.modules.hud;
 
+import moe.ramon.cryostasis.gui.Theme;
+import moe.ramon.cryostasis.hud.HudLine;
 import moe.ramon.cryostasis.hud.HudModule;
 import moe.ramon.cryostasis.hud.HudText;
 import moe.ramon.cryostasis.setting.BooleanSetting;
@@ -31,9 +33,6 @@ public final class DurabilityModule extends HudModule {
 	private static final float WARN_AT = 0.25f;
 	private static final float CRITICAL_AT = 0.10f;
 
-	private static final int COLOR_WARN = 0xFFE8B14C;
-	private static final int COLOR_CRITICAL = 0xFFE05A5A;
-
 	private final BooleanSetting hand = register(new BooleanSetting("Hand", true));
 	private final BooleanSetting offhand = register(new BooleanSetting("Offhand", true));
 	private final BooleanSetting armor = register(new BooleanSetting("Armor", true));
@@ -49,52 +48,49 @@ public final class DurabilityModule extends HudModule {
 			setBounds(0, 0, 0, 0);
 			return;
 		}
-		List<String> lines = new ArrayList<>(SLOTS);
-		int[] colors = new int[SLOTS];
+		List<HudLine> lines = new ArrayList<>(SLOTS);
 
 		// Hands first: they are what a player swaps mid-fight, so they are the lines worth having
 		// closest to a fixed position. Armor then reads head down, the way it does on the
 		// inventory screen.
 		if (hand.get()) {
-			append(lines, colors, "Hand", mc.player.getMainHandItem());
+			append(lines, "Hand", mc.player.getMainHandItem());
 		}
 		if (offhand.get()) {
-			append(lines, colors, "Offhand", mc.player.getOffhandItem());
+			append(lines, "Offhand", mc.player.getOffhandItem());
 		}
 		if (armor.get()) {
-			append(lines, colors, "Head", mc.player.getItemBySlot(EquipmentSlot.HEAD));
-			append(lines, colors, "Chest", mc.player.getItemBySlot(EquipmentSlot.CHEST));
-			append(lines, colors, "Legs", mc.player.getItemBySlot(EquipmentSlot.LEGS));
-			append(lines, colors, "Feet", mc.player.getItemBySlot(EquipmentSlot.FEET));
+			append(lines, "Head", mc.player.getItemBySlot(EquipmentSlot.HEAD));
+			append(lines, "Chest", mc.player.getItemBySlot(EquipmentSlot.CHEST));
+			append(lines, "Legs", mc.player.getItemBySlot(EquipmentSlot.LEGS));
+			append(lines, "Feet", mc.player.getItemBySlot(EquipmentSlot.FEET));
 		}
 		if (lines.isEmpty()) {
 			setBounds(0, 0, 0, 0);
 			return;
 		}
-		HudText.drawLines(this, context, lines, colors);
+		HudText.draw(this, context, lines);
 	}
 
 	/** Add one slot's line, or nothing at all when the slot holds nothing that can break. */
-	private void append(List<String> lines, int[] colors, String label, ItemStack stack) {
+	private void append(List<HudLine> lines, String label, ItemStack stack) {
 		if (!stack.isDamageableItem()) {
 			return;
 		}
 		int left = stack.getMaxDamage() - stack.getDamageValue();
 		float remaining = (float) left / stack.getMaxDamage();
 
-		StringBuilder text = new StringBuilder(label).append(' ').append(left);
+		String value = Integer.toString(left);
 		if (percent.get()) {
-			text.append(" (").append(Math.round(remaining * 100.0f)).append("%)");
+			value = value + " \u00b7 " + Math.round(remaining * 100.0f) + "%";
 		}
-		// Written before the line is added, so the index is the one this line will sit at.
-		colors[lines.size()] = color(remaining);
-		lines.add(text.toString());
+		lines.add(new HudLine(label, value, color(remaining)));
 	}
 
 	private static int color(float remaining) {
 		if (remaining <= CRITICAL_AT) {
-			return COLOR_CRITICAL;
+			return Theme.BAD;
 		}
-		return remaining <= WARN_AT ? COLOR_WARN : HudText.WHITE;
+		return remaining <= WARN_AT ? Theme.WARN : Theme.TEXT;
 	}
 }

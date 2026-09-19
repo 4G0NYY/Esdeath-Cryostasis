@@ -15,6 +15,7 @@ import itertools
 from datetime import datetime
 
 from app.domain.models import ChatMessage, Mute, Player, normalize_uuid, now
+from app.domain.presets import Preset
 
 # Same seed the Java dev instance shipped, so switching backends does not change what the
 # client sees for capes.
@@ -30,6 +31,7 @@ class MemoryRepo:
         self._chat: list[ChatMessage] = []
         self._chat_ids = itertools.count(1)
         self._mutes: dict[str, Mute] = {}
+        self._presets: dict[str, dict[str, Preset]] = {}
         self._lock = asyncio.Lock()
 
     def _ensure(self, uuid: str) -> Player:
@@ -169,6 +171,19 @@ class MemoryRepo:
     async def active_mutes(self) -> list[Mute]:
         async with self._lock:
             return [m for m in self._mutes.values() if m.is_active()]
+
+    async def list_presets(self, uuid: str) -> list[Preset]:
+        async with self._lock:
+            presets = self._presets.get(normalize_uuid(uuid), {}).values()
+            return [p.model_copy(deep=True) for p in sorted(presets, key=lambda p: p.name.lower())]
+
+    async def put_preset(self, uuid: str, preset: Preset) -> None:
+        async with self._lock:
+            self._presets.setdefault(normalize_uuid(uuid), {})[preset.name] = preset.model_copy(deep=True)
+
+    async def delete_preset(self, uuid: str, name: str) -> bool:
+        async with self._lock:
+            return self._presets.get(normalize_uuid(uuid), {}).pop(name, None) is not None
 
     async def close(self) -> None:
         return None

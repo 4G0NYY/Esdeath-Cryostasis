@@ -35,11 +35,15 @@ No Minecraft code lives in this repository. The build ships as a Fabric mod jar 
   - Player: AutoTool, AutoEquip, AutoTotem, FastBreak, NoHunger.
   - Misc: AutoText, TakeAll, TabGui, DiscordPresence, GlobalChat.
 
+  Presets switch between saved module setups from the click GUI. The built-in QoL preset
+  switches off everything a fair-play server would object to and leaves the rest alone.
+
   Still deferred, for want of the backend or of anything left to recover from the
   decompilation: Connector, MotionBlur, ItemAnimation.
 - Phase 3 (cosmetics backend): done, and hosted. `backend/` implements the full REST
   contract and runs at `cryostasis.ramon.moe` behind the session-proof handshake. Beyond
-  cosmetics it now serves ranks, a Cryostasis-wide global chat, and derived presence:
+  cosmetics it now serves ranks, a Cryostasis-wide global chat, synced module presets, and
+  derived presence:
   online, away and offline are worked out from each client's heartbeat rather than stored,
   so nothing has to announce that a player left. The same service serves the public site at
   the root of that domain, which reads its live roster from the API beneath it.

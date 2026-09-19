@@ -1,18 +1,25 @@
 package moe.ramon.cryostasis.modules.hud;
 
+import moe.ramon.cryostasis.hud.HudLine;
 import moe.ramon.cryostasis.hud.HudModule;
 import moe.ramon.cryostasis.hud.HudText;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.List;
+
 /**
  * Shows the distance to the entity you last swung at, held on screen briefly after the
  * swing so the number is readable. Measured from the eye to the nearest point of the
  * target's bounding box, which is the distance that actually governs whether a hit lands.
+ *
+ * The readout fades over its last few ticks rather than vanishing, so it reads as the swing's
+ * after-image instead of a panel that blinks off.
  */
 public final class ReachDisplayModule extends HudModule {
 	private static final int HOLD_TICKS = 40;
+	private static final float FADE_TICKS = 10.0f;
 
 	private double lastReach;
 	private int holdTicks;
@@ -49,7 +56,8 @@ public final class ReachDisplayModule extends HudModule {
 			setBounds(0, 0, 0, 0);
 			return;
 		}
-		HudText.drawLine(this, context, String.format("Reach %.2f", lastReach), HudText.WHITE);
+		float alpha = Math.min(1.0f, (holdTicks - tickDelta) / FADE_TICKS);
+		HudText.draw(this, context, List.of(HudLine.of("Reach", String.format("%.2f", lastReach))), alpha);
 	}
 
 	private static double clamp(double v, double lo, double hi) {

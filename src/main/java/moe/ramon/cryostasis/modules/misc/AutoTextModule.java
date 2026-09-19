@@ -21,6 +21,7 @@ public final class AutoTextModule extends Module {
 
 	public AutoTextModule() {
 		super("AutoText", "Sends a preset message when its key is pressed.", Category.MISC);
+		markQol();
 	}
 
 	@Override

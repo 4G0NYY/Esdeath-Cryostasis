@@ -1,5 +1,6 @@
 package moe.ramon.cryostasis.modules.hud;
 
+import moe.ramon.cryostasis.hud.HudLine;
 import moe.ramon.cryostasis.hud.HudModule;
 import moe.ramon.cryostasis.hud.HudText;
 import net.minecraft.client.gui.GuiGraphics;
@@ -15,11 +16,12 @@ public final class XyzModule extends HudModule {
 	@Override
 	public void render(GuiGraphics context, float tickDelta) {
 		if (mc.player == null) {
+			setBounds(0, 0, 0, 0);
 			return;
 		}
-		String x = "X " + (int) Math.floor(mc.player.getX());
-		String y = "Y " + (int) Math.floor(mc.player.getY());
-		String z = "Z " + (int) Math.floor(mc.player.getZ());
-		HudText.drawLines(this, context, List.of(x, y, z), HudText.WHITE);
+		HudText.draw(this, context, List.of(
+				HudLine.of("X", Integer.toString(mc.player.getBlockX())),
+				HudLine.of("Y", Integer.toString(mc.player.getBlockY())),
+				HudLine.of("Z", Integer.toString(mc.player.getBlockZ()))));
 	}
 }

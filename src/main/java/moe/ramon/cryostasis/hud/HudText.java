@@ -1,85 +1,79 @@
 package moe.ramon.cryostasis.hud;
 
+import moe.ramon.cryostasis.gui.Skin;
+import moe.ramon.cryostasis.gui.Theme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
 import java.util.List;
-import java.util.function.IntUnaryOperator;
 
 /**
- * Small helper for the common HUD case of drawing one or more anchored text lines over a
- * translucent backdrop and reporting the bounds back to a {@link HudModule}. Keeps each
- * module's render method to the logic that is actually unique to it.
+ * Draws a HUD readout as a small panel in the client's own style: the clipped plate and drop
+ * shadow the TabGui sits on, an accent stripe down the left edge, and each line split into a quiet
+ * label and a bright value, so the eye lands on the number rather than on the word naming it.
+ * Values are right-aligned, so a column of numbers lines up on its last digit.
  *
  * The anchor resolves against the whole plate rather than against the text inside it, so the
  * rectangle the editor drags is the same rectangle the position is measured from. Resolving one
  * and reporting the other makes every drag creep by the padding.
- *
- * Color is resolved through {@link HudColors}: when rainbow mode is on the passed color is
- * overridden with the sweep so every element cycles together, with a small per-line phase
- * offset so stacked lines read as a gradient.
  */
 public final class HudText {
-	public static final int WHITE = 0xFFFFFFFF;
-
-	// Themed translucent plate behind text, matching the navy click GUI rows.
-	private static final int BACKGROUND = 0x900A111B;
-	private static final int PAD_X = 2;
-	private static final int PAD_Y = 1;
+	private static final int STRIPE = 2;
+	private static final int PAD_LEFT = STRIPE + 4;
+	private static final int PAD_RIGHT = 4;
+	private static final int PAD_Y = 3;
+	private static final int LINE_GAP = 2;
+	private static final int COLUMN_GAP = 6;
 
 	private HudText() {
 	}
 
-	/** Draw a single line at the module's anchor in the default color. */
-	public static void drawLine(HudModule module, GuiGraphics context, String text) {
-		drawLine(module, context, text, WHITE);
+	public static void draw(HudModule module, GuiGraphics context, HudLine line) {
+		draw(module, context, List.of(line), 1.0f);
 	}
 
-	/** Draw a single line at the module's anchor and record its bounds. */
-	public static void drawLine(HudModule module, GuiGraphics context, String text, int color) {
-		drawLines(module, context, List.of(text), color);
+	public static void draw(HudModule module, GuiGraphics context, List<HudLine> lines) {
+		draw(module, context, lines, 1.0f);
 	}
 
-	/** Draw a stack of lines at the module's anchor in the default color. */
-	public static void drawLines(HudModule module, GuiGraphics context, List<String> lines) {
-		drawLines(module, context, lines, WHITE);
-	}
-
-	/** Draw a stack of lines at the module's anchor and record the combined bounds. */
-	public static void drawLines(HudModule module, GuiGraphics context, List<String> lines, int color) {
-		draw(module, context, lines, index -> color);
-	}
-
-	/**
-	 * Draw a stack of lines, each in its own colour, and record the combined bounds. For elements
-	 * where the colour says something about the line it is on rather than styling the block as a
-	 * whole. {@code colors} must hold at least one entry per line.
-	 */
-	public static void drawLines(HudModule module, GuiGraphics context, List<String> lines, int[] colors) {
-		draw(module, context, lines, index -> colors[index]);
-	}
-
-	private static void draw(HudModule module, GuiGraphics context, List<String> lines,
-			IntUnaryOperator colorAt) {
+	/** Draw the readout at {@code alpha} opacity, for an element that fades rather than blinks out. */
+	public static void draw(HudModule module, GuiGraphics context, List<HudLine> lines, float alpha) {
 		Font font = Minecraft.getInstance().font;
-		int lineHeight = font.lineHeight + 1;
-		int widest = 0;
-		for (String line : lines) {
-			widest = Math.max(widest, font.width(line));
+		int labelWidth = 0;
+		int valueWidth = 0;
+		for (HudLine line : lines) {
+			labelWidth = Math.max(labelWidth, font.width(line.label()));
+			valueWidth = Math.max(valueWidth, font.width(line.value()));
 		}
-		int width = widest + PAD_X * 2;
-		int height = lineHeight * lines.size() + PAD_Y * 2;
+		int gap = labelWidth > 0 && valueWidth > 0 ? COLUMN_GAP : 0;
+		int width = PAD_LEFT + labelWidth + gap + valueWidth + PAD_RIGHT;
+		int lineHeight = font.lineHeight + LINE_GAP;
+		int height = PAD_Y * 2 + lines.size() * lineHeight - LINE_GAP;
 		int x = module.resolveX(context.guiWidth(), width);
 		int y = module.resolveY(context.guiHeight(), height);
 
-		context.fill(x, y, x + width, y + height, BACKGROUND);
-		int cursor = y + PAD_Y;
+		Skin.shadow(context, x, y, width, height, alpha);
+		Skin.panel(context, x, y, width, height, Skin.fade(Theme.PANEL, alpha));
+		// Inset by a pixel top and bottom so the panel keeps its clipped corners.
+		context.fill(x, y + 1, x + STRIPE, y + height - 1, Skin.fade(HudColors.accent(0.0f), alpha));
+
+		int rowY = y + PAD_Y;
 		for (int i = 0; i < lines.size(); i++) {
-			int lineColor = HudColors.isRainbow() ? HudColors.rainbow(i * 0.08f) : colorAt.applyAsInt(i);
-			context.drawString(font, lines.get(i), x + PAD_X, cursor, lineColor);
-			cursor += lineHeight;
+			HudLine line = lines.get(i);
+			context.drawString(font, line.label(), x + PAD_LEFT, rowY, Skin.fade(Theme.SUBTEXT, alpha), false);
+			int valueX = x + width - PAD_RIGHT - font.width(line.value());
+			context.drawString(font, line.value(), valueX, rowY, Skin.fade(valueColor(line, i), alpha), false);
+			rowY += lineHeight;
 		}
 		module.setBounds(x, y, width, height);
+	}
+
+	/** A value with a colour of its own keeps it in rainbow mode, since that colour is the reading. */
+	private static int valueColor(HudLine line, int index) {
+		if (line.color() == Theme.TEXT && HudColors.isRainbow()) {
+			return HudColors.rainbow(index * 0.08f);
+		}
+		return line.color();
 	}
 }

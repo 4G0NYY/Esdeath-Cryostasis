@@ -13,6 +13,7 @@ public final class BlockOutlineModule extends Module {
 
 	public BlockOutlineModule() {
 		super("BlockOutline", "Recolors the block selection outline.", Category.RENDER);
+		markQol();
 	}
 
 	public int getColor() {

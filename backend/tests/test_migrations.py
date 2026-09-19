@@ -46,7 +46,14 @@ def test_chain_applies_to_an_empty_database(database: str):
 
     inspector = inspect(create_engine(database))
     tables = set(inspector.get_table_names())
-    assert {"players", "cosmetics", "player_cosmetics", "chat_messages", "chat_mutes"} <= tables
+    assert {
+        "players",
+        "cosmetics",
+        "player_cosmetics",
+        "chat_messages",
+        "chat_mutes",
+        "player_presets",
+    } <= tables
 
     # The columns 0004 adds, which are what the presence feature rests on.
     players = {c["name"] for c in inspector.get_columns("players")}

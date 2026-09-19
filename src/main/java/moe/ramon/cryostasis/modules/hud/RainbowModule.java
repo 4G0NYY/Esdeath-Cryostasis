@@ -15,6 +15,7 @@ public final class RainbowModule extends Module {
 
 	public RainbowModule() {
 		super("Rainbow", "Cycles the HUD text through the color spectrum.", Category.HUD);
+		markQol();
 	}
 
 	@Override

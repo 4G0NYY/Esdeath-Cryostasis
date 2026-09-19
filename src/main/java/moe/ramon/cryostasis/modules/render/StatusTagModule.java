@@ -25,6 +25,7 @@ public final class StatusTagModule extends Module {
 	public StatusTagModule() {
 		super("StatusTag", "Shows the Cryostasis emblem, rank, and status on player name tags.",
 				Category.RENDER);
+		markQol();
 	}
 
 	public boolean showEmblem() {

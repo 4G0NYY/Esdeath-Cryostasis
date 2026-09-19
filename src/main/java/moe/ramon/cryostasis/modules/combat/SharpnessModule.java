@@ -12,5 +12,6 @@ import moe.ramon.cryostasis.module.Module;
 public final class SharpnessModule extends Module {
 	public SharpnessModule() {
 		super("Sharpness", "Shows crit particles on every hit.", Category.COMBAT);
+		markQol();
 	}
 }

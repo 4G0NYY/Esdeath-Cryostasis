@@ -1,5 +1,7 @@
 package moe.ramon.cryostasis.hud;
 
+import moe.ramon.cryostasis.gui.Skin;
+import moe.ramon.cryostasis.gui.Theme;
 import moe.ramon.cryostasis.module.Category;
 import moe.ramon.cryostasis.module.Module;
 import net.minecraft.client.Minecraft;
@@ -21,9 +23,6 @@ import net.minecraft.client.gui.GuiGraphics;
  * pixel of the drag.
  */
 public abstract class HudModule extends Module {
-	private static final int PLACEHOLDER = 0x50FFFFFF;
-	private static final int PLACEHOLDER_TEXT = 0xFF9AA7B8;
-
 	private final double defaultAnchorX;
 	private final double defaultAnchorY;
 
@@ -51,6 +50,8 @@ public abstract class HudModule extends Module {
 	protected HudModule(String name, String description, Category category,
 			double defaultAnchorX, double defaultAnchorY) {
 		super(name, description, category);
+		// Every HUD element only reads what the client already knows and draws it.
+		markQol();
 		this.defaultAnchorX = defaultAnchorX;
 		this.defaultAnchorY = defaultAnchorY;
 		this.anchorX = defaultAnchorX;
@@ -195,12 +196,14 @@ public abstract class HudModule extends Module {
 	public final void renderPlaceholder(GuiGraphics context) {
 		Font font = Minecraft.getInstance().font;
 		String label = getName();
-		int width = font.width(label) + 6;
-		int height = font.lineHeight + 3;
+		int width = font.width(label) + 10;
+		int height = font.lineHeight + 6;
 		int x = resolveX(context.guiWidth(), width);
 		int y = resolveY(context.guiHeight(), height);
-		context.fill(x, y, x + width, y + height, PLACEHOLDER);
-		context.drawString(font, label, x + 3, y + 2, PLACEHOLDER_TEXT, false);
+		// Half the opacity of a live readout, so a stand-in never passes for one.
+		Skin.panel(context, x, y, width, height, Skin.fade(Theme.PANEL, 0.5f));
+		Skin.border(context, x, y, x + width, y + height, Theme.ACCENT_DIM);
+		context.drawString(font, label, x + 5, y + 3, Theme.SUBTEXT, false);
 		setBounds(x, y, width, height);
 	}
 }

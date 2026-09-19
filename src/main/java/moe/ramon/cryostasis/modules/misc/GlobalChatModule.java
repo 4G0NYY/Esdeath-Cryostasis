@@ -26,6 +26,7 @@ public final class GlobalChatModule extends Module {
 
 	public GlobalChatModule() {
 		super("GlobalChat", "Cryostasis-wide chat, sent by prefixing a message.", Category.MISC);
+		markQol();
 	}
 
 	@Override
@@ -52,7 +53,7 @@ public final class GlobalChatModule extends Module {
 	}
 
 	@Override
-	public String getHudLabel() {
-		return getName() + " " + prefix();
+	public String getHudSuffix() {
+		return prefix();
 	}
 }

@@ -27,7 +27,21 @@ Dropping an element snaps it to the screen edges, the screen centre, and to the 
 of the other elements, with a guide line drawn along whatever caught it, so two elements line up
 exactly rather than nearly. Arrow keys nudge the selected element one pixel at a time. An element
 that has nothing to show at that moment, like the reach readout between swings, still appears in
-the editor as a small grey chip so it can be placed.
+the editor as a faint outlined chip so it can be placed.
+
+Every readout is drawn in the same style as the TabGui and the menus: a translucent panel with an
+accent stripe down its left edge, a dim label, and a bright right-aligned value. Where a colour says
+something, the value carries it:
+
+| Readout | Green | Amber | Red |
+|---|---|---|---|
+| PingTag | under 100 ms | 100 to 199 ms | 200 ms and up |
+| Durability | | 25% or less left | 10% or less left |
+| MLGHelper | | the fall would hurt | nothing solid below |
+
+Rainbow sweeps the accent stripes and the neutral values but leaves those colours alone, since
+they are the reading. The ArrayList slides a module in when it turns on and back out when it turns
+off, and its staircase faces whichever screen edge you drag it nearer to.
 
 | Module | What it shows | Settings |
 |---|---|---|
@@ -38,7 +52,7 @@ the editor as a small grey chip so it can be placed.
 | PingTag | Your latency to the current server | none |
 | Plains | The biome you are standing in | none |
 | Durability | Uses left in each hand and each worn armor piece | Hand, Offhand, Armor, Percent |
-| MLGHelper | While sneaking, your fall height and a water-bucket cue | none |
+| MLGHelper | While sneaking, your fall height, amber once the fall would hurt | none |
 | ArrayList | The list of active modules, top right, sorted by width | Background on/off |
 | OnlineList | Everyone currently running Cryostasis, with their rank colour and status | Max Rows, Show Away, Show Status, Header |
 
@@ -126,6 +140,10 @@ camera and just free the direction.
 A press is ignored while a menu is open, so the key is safe to hold while typing, and a
 release always counts, so nothing can leave your view stuck outside your body. If Freecam has
 the camera out, it keeps it and Freelook stays out of its way.
+
+Hypixel forbids freelook, so while you are connected to `hypixel.net` or any of its subdomains the
+key does nothing and the ArrayList shows Freelook as "off here". The module itself stays on, so it
+works again the moment you join any other server.
 
 ## Combat
 
@@ -231,6 +249,45 @@ launch. Until then you will be told to try again in a moment. Messages are cappe
 characters and rate limited, and staff can mute a player who abuses the channel. If you hold a
 staff rank, `@/mute <player> [minutes] [reason]`, `@/unmute <player>` and `@/mutes` work from the
 same prefix.
+
+## Presets
+
+The last panel in the click GUI holds presets: named setups you switch between with one click.
+
+| Action | How |
+|---|---|
+| Apply a preset | Left click it |
+| Save the current setup as a new preset | Type a name in the field, then Enter or "+ Save current" |
+| Overwrite a preset with the current setup | Right click it |
+| Delete a preset | Shift + right click it |
+
+A preset remembers which modules are on and every module's settings. Keybinds and HUD positions
+are not part of it, so switching presets never moves your HUD or rebinds a key. Applying a preset
+switches off every module it does not mention, including any added to the client after you saved
+it. A row with an accent stripe is the preset that describes what is on right now. The number on
+the right is how many modules it turns on.
+
+Names are up to 24 letters, digits, spaces, `-` and `_`, and you can keep up to 32 presets.
+
+### QoL
+
+QoL is built in and cannot be deleted. It is a rule rather than a snapshot: applying it switches
+off every module that is not quality of life and leaves the rest exactly as they are, so your HUD
+survives and nothing new turns on. Its row is marked while nothing unsafe is on, which makes it a
+quick check before you join a server that cares.
+
+Quality of life means every HUD module, Rainbow, ToggleSprint, BlockOutline, Hitbox, Zoom,
+CleanChat, StatusTag, Nightvision, Freelook, MoreParticles, Sharpness, AutoText, TabGui,
+DiscordRPC and GlobalChat. Everything else, including TakeAll and AutoTool, counts as unsafe.
+
+### Sync
+
+Presets are saved to the backend, so they follow your account to every machine you play on. A
+change is kept locally first and uploaded once the client is signed in to the backend, which it
+does by itself shortly after launch. Until the backend has confirmed it, the preset reads "local"
+in amber instead of its module count. The list is refreshed from the backend each time you sign in
+and each time you open the click GUI, so a preset saved or deleted on another machine shows up
+here too. Presets are private: nobody else can read yours.
 
 ## Ranks
 

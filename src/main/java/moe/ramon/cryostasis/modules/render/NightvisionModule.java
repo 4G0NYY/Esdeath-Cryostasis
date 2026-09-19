@@ -22,5 +22,6 @@ import moe.ramon.cryostasis.module.Module;
 public final class NightvisionModule extends Module {
 	public NightvisionModule() {
 		super("Nightvision", "Keep the world bright and ignore darkness, like the night vision potion.", Category.RENDER);
+		markQol();
 	}
 }

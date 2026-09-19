@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -122,6 +122,19 @@ class ChatMuteRow(Base):
     until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     reason: Mapped[str] = mapped_column(String(256), default="", server_default="")
     by_uuid: Mapped[str] = mapped_column(String(36), default="", server_default="")
+
+
+class PresetRow(Base):
+    """A saved module preset. `modules` is opaque here: only the client reads it back."""
+
+    __tablename__ = "player_presets"
+
+    player_uuid: Mapped[str] = mapped_column(
+        String(36), ForeignKey("players.uuid", ondelete="CASCADE"), primary_key=True
+    )
+    name: Mapped[str] = mapped_column(String(24), primary_key=True)
+    modules: Mapped[dict] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class NonceRow(Base):

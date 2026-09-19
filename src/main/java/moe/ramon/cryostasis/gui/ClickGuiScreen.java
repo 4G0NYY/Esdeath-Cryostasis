@@ -5,6 +5,7 @@ import moe.ramon.cryostasis.Cryostasis;
 import moe.ramon.cryostasis.input.InputHandler;
 import moe.ramon.cryostasis.module.Category;
 import moe.ramon.cryostasis.module.Module;
+import moe.ramon.cryostasis.preset.PresetManager;
 import moe.ramon.cryostasis.setting.BooleanSetting;
 import moe.ramon.cryostasis.setting.ColorSetting;
 import moe.ramon.cryostasis.setting.KeybindSetting;
@@ -13,6 +14,7 @@ import moe.ramon.cryostasis.setting.NumberSetting;
 import moe.ramon.cryostasis.setting.Setting;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
@@ -24,7 +26,8 @@ import java.util.Set;
 
 /**
  * The module configuration menu. One draggable panel per category; each panel lists its
- * modules. Left click toggles a module, right click expands its settings. Settings edit
+ * modules, and a last panel holds the presets (see {@link PresetPanel}). Left click toggles a
+ * module, right click expands its settings. Settings edit
  * inline: booleans toggle, modes cycle, numbers ride a slider the mouse drags, keybinds
  * capture the next key, colors cycle a small preset palette. Right clicking any setting
  * restores the value it shipped with.
@@ -35,12 +38,10 @@ import java.util.Set;
  * row was one height and stopped being so the moment sliders became taller than the rest.
  */
 public final class ClickGuiScreen extends Screen {
-	private static final int PANEL_WIDTH = 112;
 	private static final int PANEL_GAP = 4;
 	private static final int MARGIN = 6;
-	private static final int ROW_HEIGHT = 13;
 	private static final int SLIDER_HEIGHT = 21;
-	private static final int HEADER_HEIGHT = 14;
+	private static final int NAME_FIELD_HEIGHT = 12;
 
 	/** Horizontal inset of a slider track from the panel edge. */
 	private static final int TRACK_INSET = 7;
@@ -51,7 +52,6 @@ public final class ClickGuiScreen extends Screen {
 	/** How far the handle stands proud of the track, above and below. */
 	private static final int HANDLE_GROW = 3;
 
-	private static final int COLOR_HEADER = Theme.HEADER;
 	private static final int COLOR_PANEL = Theme.ROW;
 	private static final int COLOR_ENABLED = Theme.ACCENT;
 	private static final int COLOR_TEXT = Theme.TEXT;
@@ -61,15 +61,15 @@ public final class ClickGuiScreen extends Screen {
 			0xFFFF5555, 0xFF55FF55, 0xFF5555FF, 0xFFFFFF55, 0xFFFF55FF, 0xFF55FFFF, 0xFFFFFFFF
 	};
 
-	// Persist panel positions and expansion across reopenings within a session. The panels
-	// outlive the screen that built them, so they hold layout state only and take the screen
-	// that is currently showing them as a parameter. An inner class would instead capture the
-	// first screen forever, and every menu opened after that one would write its bind state
-	// into a screen that is no longer on display.
-	private static final List<Panel> PANELS = new ArrayList<>();
+	// Persist panel positions and expansion across reopenings within a session.
+	private static final List<ClickPanel> PANELS = new ArrayList<>();
+	private static final PresetPanel PRESETS = new PresetPanel();
 	private static boolean initialized;
 
-	private Panel dragging;
+	/** The preset name field. A widget rather than drawn, so it gets vanilla's text editing. */
+	EditBox presetName;
+
+	private ClickPanel dragging;
 	private int dragOffsetX;
 	private int dragOffsetY;
 	private KeybindSetting bindingCapture;
@@ -88,29 +88,43 @@ public final class ClickGuiScreen extends Screen {
 
 	@Override
 	protected void init() {
+		// Rebuilt on every init, resizes included, since widgets belong to the screen and not to
+		// the panels. The text a player had typed is carried over.
+		String typed = presetName != null ? presetName.getValue() : "";
+		presetName = new EditBox(font, 0, 0, ClickPanel.WIDTH, NAME_FIELD_HEIGHT, Component.literal("Preset name"));
+		presetName.setMaxLength(PresetManager.MAX_NAME_LENGTH);
+		presetName.setHint(Component.literal("Preset name"));
+		presetName.setValue(typed);
+		addRenderableWidget(presetName);
+
+		// This menu is where a preset saved on another machine would be looked for.
+		Cryostasis.get().getPresetService().requestPull();
+
 		if (initialized) {
 			return;
 		}
 		// Laid out here rather than in the constructor because it needs the screen size, which a
-		// constructor does not have. Six panels in one row is over 690 units wide, and at a high
+		// constructor does not have. Seven panels in one row is over 800 units wide, and at a high
 		// GUI scale the usable width is as little as 320, so a single row would start most
-		// categories off screen with no way to know they were there. They are draggable after
+		// panels off screen with no way to know they were there. They are draggable after
 		// this; the wrap only decides where they begin.
+		for (Category category : Category.values()) {
+			PANELS.add(new Panel(category));
+		}
+		PANELS.add(PRESETS);
 		int x = MARGIN;
 		int y = MARGIN;
 		int rowHeight = 0;
-		for (Category category : Category.values()) {
-			if (x > MARGIN && x + PANEL_WIDTH > width) {
+		for (ClickPanel panel : PANELS) {
+			if (x > MARGIN && x + ClickPanel.WIDTH > width) {
 				x = MARGIN;
 				y += rowHeight + MARGIN;
 				rowHeight = 0;
 			}
-			PANELS.add(new Panel(category, x, y));
-			x += PANEL_WIDTH + PANEL_GAP;
-			// The collapsed height, since a panel starts with its modules listed and its settings
-			// folded away.
-			int modules = Cryostasis.get().getModuleManager().getByCategory(category).size();
-			rowHeight = Math.max(rowHeight, HEADER_HEIGHT + modules * ROW_HEIGHT);
+			panel.x = x;
+			panel.y = y;
+			x += ClickPanel.WIDTH + PANEL_GAP;
+			rowHeight = Math.max(rowHeight, ClickPanel.HEADER_HEIGHT + panel.bodyHeight());
 		}
 		initialized = true;
 	}
@@ -127,12 +141,17 @@ public final class ClickGuiScreen extends Screen {
 		// already sits over a frame that requested it, so calling renderBackground here
 		// throws "Can only blur once per frame".
 		context.fill(0, 0, width, height, Theme.DIM);
-		for (Panel panel : PANELS) {
+		// The preset panel shows the field again if it is unfolded and drawn this frame.
+		presetName.visible = false;
+		for (ClickPanel panel : PANELS) {
 			panel.render(this, context, mouseX, mouseY);
 		}
+		String presetFooter = PRESETS.footer(mouseX, mouseY);
 		if (bindingModule != null || bindingCapture != null) {
 			context.drawCenteredString(font,
 					"Press a key to bind, Escape to clear", width / 2, height - 14, COLOR_TEXT);
+		} else if (presetFooter != null) {
+			context.drawCenteredString(font, presetFooter, width / 2, height - 14, PRESETS.footerColor());
 		} else {
 			// The other two menus have no button anywhere, so the only place their keys can be
 			// discovered is the menu a new player does find.
@@ -142,6 +161,7 @@ public final class ClickGuiScreen extends Screen {
 							+ keyName(input.getOpenHudEditorKey()) + " move the HUD",
 					width / 2, height - 14, COLOR_SUBTEXT);
 		}
+		super.render(context, mouseX, mouseY, delta);
 	}
 
 	@Override
@@ -150,7 +170,9 @@ public final class ClickGuiScreen extends Screen {
 		// Without this the next key press lands on a bind the user has already moved away from.
 		bindingModule = null;
 		bindingCapture = null;
-		for (Panel panel : PANELS) {
+		// Any click unfocuses the name field; one that lands on it focuses it again in super.
+		setFocused(null);
+		for (ClickPanel panel : PANELS) {
 			// Header: left drag to move, right click to collapse the whole panel.
 			if (panel.inHeader(mouseX, mouseY)) {
 				if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
@@ -195,7 +217,7 @@ public final class ClickGuiScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
-		for (Panel panel : PANELS) {
+		for (ClickPanel panel : PANELS) {
 			if (!panel.collapsed && panel.handleScroll(mouseX, mouseY, vertical)) {
 				return true;
 			}
@@ -214,6 +236,10 @@ public final class ClickGuiScreen extends Screen {
 		if (bindingCapture != null) {
 			bindingCapture.set(keyCode == GLFW.GLFW_KEY_ESCAPE ? GLFW.GLFW_KEY_UNKNOWN : keyCode);
 			bindingCapture = null;
+			return true;
+		}
+		if (presetName.isFocused() && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
+			PRESETS.saveFrom(presetName);
 			return true;
 		}
 		return super.keyPressed(keyCode, scanCode, modifiers);
@@ -311,29 +337,22 @@ public final class ClickGuiScreen extends Screen {
 	}
 
 	/** A single category column. */
-	private static final class Panel {
+	private static final class Panel extends ClickPanel {
 		private final Category category;
-		private int x;
-		private int y;
-		private boolean collapsed;
 		private final Set<Module> expanded = new HashSet<>();
 
-		Panel(Category category, int x, int y) {
+		Panel(Category category) {
+			super(category.getDisplayName());
 			this.category = category;
-			this.x = x;
-			this.y = y;
 		}
 
 		private List<Module> modules() {
 			return Cryostasis.get().getModuleManager().getByCategory(category);
 		}
 
-		boolean inHeader(double mx, double my) {
-			return mx >= x && mx <= x + PANEL_WIDTH && my >= y && my <= y + HEADER_HEIGHT;
-		}
-
-		private boolean inColumn(double mx) {
-			return mx >= x && mx <= x + PANEL_WIDTH;
+		@Override
+		int bodyHeight() {
+			return modules().size() * ROW_HEIGHT;
 		}
 
 		private int trackX() {
@@ -341,7 +360,7 @@ public final class ClickGuiScreen extends Screen {
 		}
 
 		private int trackWidth() {
-			return PANEL_WIDTH - TRACK_INSET * 2;
+			return WIDTH - TRACK_INSET * 2;
 		}
 
 		/**
@@ -372,19 +391,15 @@ public final class ClickGuiScreen extends Screen {
 			return rows;
 		}
 
-		void render(ClickGuiScreen screen, GuiGraphics context, int mouseX, int mouseY) {
+		@Override
+		void renderBody(ClickGuiScreen screen, GuiGraphics context, int mouseX, int mouseY) {
 			Font font = screen.font;
-			context.fill(x, y, x + PANEL_WIDTH, y + HEADER_HEIGHT, COLOR_HEADER);
-			// Accent underline on the header, echoing the title screen's panel seam.
-			context.fill(x, y + HEADER_HEIGHT - 1, x + PANEL_WIDTH, y + HEADER_HEIGHT, Theme.ACCENT);
-			context.drawString(font, category.getDisplayName(), x + 4, y + 3, COLOR_TEXT);
-
 			for (Row row : layout()) {
 				boolean hovered = inColumn(mouseX) && row.contains(mouseY);
 				switch (row.kind()) {
 					case MODULE -> renderModule(context, font, row, hovered);
 					case BIND -> {
-						context.fill(x, row.y(), x + PANEL_WIDTH, row.y() + row.height(), Theme.SETTING_ROW);
+						context.fill(x, row.y(), x + WIDTH, row.y() + row.height(), Theme.SETTING_ROW);
 						int color = screen.bindingModule == row.module() ? Theme.ACCENT : COLOR_SUBTEXT;
 						context.drawString(font, "Bind: " + keyName(row.module().getKeyCode()),
 								x + 8, row.y() + 3, color);
@@ -396,7 +411,7 @@ public final class ClickGuiScreen extends Screen {
 
 		private void renderModule(GuiGraphics context, Font font, Row row, boolean hovered) {
 			Module module = row.module();
-			context.fill(x, row.y(), x + PANEL_WIDTH, row.y() + row.height(),
+			context.fill(x, row.y(), x + WIDTH, row.y() + row.height(),
 					hovered ? Theme.ROW_HOVER : COLOR_PANEL);
 			// A left accent stripe marks the enabled modules at a glance.
 			if (module.isEnabled()) {
@@ -407,14 +422,14 @@ public final class ClickGuiScreen extends Screen {
 			// Show the toggle key on the row so a bind is visible at a glance.
 			if (module.hasKeybind()) {
 				String key = keyName(module.getKeyCode());
-				context.drawString(font, key, x + PANEL_WIDTH - font.width(key) - 4, row.y() + 3, COLOR_SUBTEXT);
+				context.drawString(font, key, x + WIDTH - font.width(key) - 4, row.y() + 3, COLOR_SUBTEXT);
 			}
 		}
 
 		private void renderSetting(ClickGuiScreen screen, GuiGraphics context, Font font, Row row,
 				boolean hovered, int mouseX) {
 			Setting<?> setting = row.setting();
-			context.fill(x, row.y(), x + PANEL_WIDTH, row.y() + row.height(),
+			context.fill(x, row.y(), x + WIDTH, row.y() + row.height(),
 					hovered ? Theme.ROW_HOVER : Theme.SETTING_ROW);
 
 			if (setting instanceof NumberSetting number) {
@@ -426,7 +441,7 @@ public final class ClickGuiScreen extends Screen {
 			// A colour is the one value whose name says nothing about it, so the row carries a
 			// swatch of what it is actually set to.
 			if (setting instanceof ColorSetting swatch) {
-				Skin.plate(context, x + PANEL_WIDTH - 14, row.y() + 3, 10, 7,
+				Skin.plate(context, x + WIDTH - 14, row.y() + 3, 10, 7,
 						swatch.get(), Theme.CELL_BORDER);
 			}
 		}
@@ -435,7 +450,7 @@ public final class ClickGuiScreen extends Screen {
 				NumberSetting number, Row row, boolean hovered, int mouseX) {
 			context.drawString(font, number.getName(), x + 7, row.y() + 2, COLOR_SUBTEXT);
 			String value = trim(number.get());
-			context.drawString(font, value, x + PANEL_WIDTH - font.width(value) - 7, row.y() + 2,
+			context.drawString(font, value, x + WIDTH - font.width(value) - 7, row.y() + 2,
 					Theme.ACCENT);
 
 			int trackX = trackX();
@@ -457,6 +472,7 @@ public final class ClickGuiScreen extends Screen {
 					active ? Theme.ACCENT : Theme.ACCENT_DIM, active ? Theme.TEXT : Theme.ACCENT);
 		}
 
+		@Override
 		boolean handleClick(ClickGuiScreen screen, double mx, double my, int button) {
 			if (!inColumn(mx)) {
 				return false;
@@ -496,6 +512,7 @@ public final class ClickGuiScreen extends Screen {
 			return false;
 		}
 
+		@Override
 		boolean handleScroll(double mx, double my, double vertical) {
 			if (!inColumn(mx) || vertical == 0) {
 				return false;
